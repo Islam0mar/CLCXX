@@ -55,8 +55,8 @@
 ;;   char *name;
 ;;   bool method_p;
 ;;   char *class_obj;
-;;   void *thunk_func;
-;;   size_t index;
+;;   void *thunk_ptr;
+;;   void *func_ptr;
 ;;   char *arg_types;
 ;;   char *return_type;
 ;; } FunctionInfo;
@@ -64,8 +64,8 @@
   (name :string)
   (method-p :bool)
   (class-obj :string)
-  (thunc-func :pointer)
-  (index :uint16)
+  (thunc-ptr :pointer)
+  (func-ptr :pointer)
   (arg-types :string)
   (return-type :string))
 
@@ -106,23 +106,23 @@
                  name value)))
     (2 (print "function")
        (print meta-ptr)
-       (with-foreign-slots ((name method-p class-obj thunc-func index arg-types return-type) meta-ptr (:struct function-info))
-         (format t "name:~A method-p:~A class-obj:~A thunc-func:~A index:~A arg-types:~A return-type:~A~%"
-                 name method-p class-obj thunc-func index arg-types return-type)))))
+       (with-foreign-slots ((name method-p class-obj thunc-ptr func-ptr arg-types return-type) meta-ptr (:struct function-info))
+         (format t "name:~A method-p:~A class-obj:~A thunc-ptr:~A func-ptr:~A arg-types:~A return-type:~A~%"
+                 name method-p class-obj thunc-ptr func-ptr arg-types return-type)))))
 
-;; void remove_package(char *pack_name)
-(defcfun ("remove_package" remove-package) :void
+;; bool remove_package(char *pack_name)
+(defcfun ("remove_package" remove-package) :bool
   (name :string))
 
-;; void clcxx_init(void (*error_handler)(char *),
+;; bool clcxx_init(void (*error_handler)(char *),
 ;;                      void (*reg_data_callback)(MetaData *, uint8_t))
-(defcfun ("clcxx_init" init) :void
+(defcfun ("clcxx_init" init) :bool
   (err-callback :pointer)
   (reg-data-callback :pointer))
 
-;; void register_lisp_package(const char *cl_pack,
+;; bool register_lisp_package(const char *cl_pack,
 ;;                                  void (*regfunc)(clcxx::Package &))
-(defcfun ("register_package" register-package) :void
+(defcfun ("register_package" register-package) :bool
   (name :string)
   (pack-ptr :pointer))
 

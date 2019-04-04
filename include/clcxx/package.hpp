@@ -28,8 +28,8 @@ extern "C" typedef struct {
   char *name;
   bool method_p;
   char *class_obj;
-  void *thunk_func;
-  size_t index;
+  const void *thunk_ptr;
+  const void *func_ptr;
   char *arg_types;
   char *return_type;
 } FunctionInfo;
@@ -55,11 +55,24 @@ char *str_append(char *old_str, const char *src);
 template <typename T>
 void remove_c_strings(T obj);
 
-template <typename T, typename... Args>
+// Base class to specialize for constructor
+template <typename CppT, bool DefaultConstructor, typename... Args>
+struct CppConstructor {
+  void *operator()(Args... args) const {
+    CppT *obj_ptr = new CppT(args...);
+    void *ptr = reinterpret_cast<void *>(obj_ptr);
+    return ptr;
+  }
+};
+
+template <typename CppT>
+struct CppConstructor<CppT, false> {
+  void *operator()() const { return nullptr; }
+};
+
+template <typename CppT, bool DefaultConstructor = true, typename... Args>
 void *create_class(Args... args) {
-  T *obj_ptr = new T(args...);
-  void *ptr = reinterpret_cast<void *>(obj_ptr);
-  return ptr;
+  return CppConstructor<CppT, DefaultConstructor, Args...>()(args...);
 }
 
 template <typename T>
@@ -122,6 +135,23 @@ struct NeedConvertHelper<> {
 
 }  // namespace detail
 
+/// Abstract base class for storing any function
+class CLCXX_API FunctionWrapperBase {};
+
+/// Implementation of function storage, case of std::function
+template <typename R, typename... Args>
+class FunctionWrapper : public FunctionWrapperBase {
+ public:
+  typedef std::function<R(Args...)> functor_t;
+
+  FunctionWrapper(const functor_t &function) : p_function(function) {}
+
+  const void *ptr() { return reinterpret_cast<const void *>(&p_function); }
+
+ private:
+  functor_t p_function;
+};
+
 /// Registry containing different packages
 class CLCXX_API PackageRegistry {
  public:
@@ -147,7 +177,7 @@ class CLCXX_API PackageRegistry {
   bool has_current_package() { return p_current_package != nullptr; }
   Package &current_package();
   void reset_current_package() { p_current_package = nullptr; }
-  std::vector<std::shared_ptr<const void *>> functions();
+  std::vector<std::shared_ptr<FunctionWrapperBase>> functions();
 
   ~PackageRegistry() {
     for (auto const &p : p_packages) {
@@ -190,10 +220,10 @@ struct CallFunctor {
   using return_type = decltype(ReturnTypeAdapter<R, Args...>()(
       std::declval<const void *>(), std::declval<mapped_lisp_type<Args>>()...));
 
-  static return_type apply(size_t index, mapped_lisp_type<Args>... args) {
+  static return_type apply(const void *functor,
+                           mapped_lisp_type<Args>... args) {
     try {
-      const void *f = *registry().functions().at(index);
-      return ReturnTypeAdapter<R, Args...>()(f, args...);
+      return ReturnTypeAdapter<R, Args...>()(functor, args...);
     } catch (const std::exception &err) {
       lisp_error(err.what());
     }
@@ -212,22 +242,21 @@ class CLCXX_API Package {
 
   /// Define a new function
   template <typename R, typename... Args>
-  void defun(const std::string &name, std::function<R(Args...)> functor,
+  void defun(const std::string &name, std::function<R(Args...)> f,
              bool is_method = false, const char *class_name = "") {
     FunctionInfo f_info;
     f_info.name = detail::str_dup(name.c_str());
     f_info.method_p = is_method;
     f_info.class_obj = detail::str_dup(class_name);
-    f_info.thunk_func =
-        reinterpret_cast<void *>(detail::CallFunctor<R, Args...>::apply);
-    f_info.index = p_functions.size();
+    f_info.thunk_ptr =
+        reinterpret_cast<const void *>(detail::CallFunctor<R, Args...>::apply);
     f_info.arg_types =
         detail::str_dup(detail::arg_types_string<Args...>().c_str());
     f_info.return_type = detail::str_dup(lisp_type<R>().c_str());
     p_functions_meta_data.push_back(f_info);
-    auto f_ptr = std::make_shared<const void *>(
-        new const std::function<R(Args...)>(functor));
-    p_functions.push_back(f_ptr);
+    auto *new_wrapper = new FunctionWrapper<R, Args...>(f);
+    p_functions.push_back(std::shared_ptr<FunctionWrapperBase>(new_wrapper));
+    f_info.func_ptr = new_wrapper->ptr();
   }
 
   /// Define a new function. Overload for pointers
@@ -246,10 +275,11 @@ class CLCXX_API Package {
   }
 
   /// Add a composite type
-  template <typename T, typename... s_classes>
+  template <typename T, bool Constructor = true, typename... s_classes>
   ClassWrapper<T> defclass(const std::string &name, s_classes... super) {
     ClassInfo c_info;
-    c_info.constructor = reinterpret_cast<void *>(detail::create_class<T>);
+    c_info.constructor =
+        reinterpret_cast<void *>(detail::create_class<T, Constructor>);
     c_info.destructor = reinterpret_cast<void *>(detail::remove_class<T>);
     c_info.slot_types = nullptr;
     c_info.slot_names = nullptr;
@@ -274,7 +304,9 @@ class CLCXX_API Package {
   }
 
   std::string name() const { return p_cl_pack; }
-  std::vector<std::shared_ptr<const void *>> functions() { return p_functions; }
+  std::vector<std::shared_ptr<FunctionWrapperBase>> functions() {
+    return p_functions;
+  }
   std::unordered_map<std::type_index, std::string> classes() {
     return class_name;
   }
@@ -309,7 +341,7 @@ class CLCXX_API Package {
   }
 
   std::string p_cl_pack;
-  std::vector<std::shared_ptr<const void *>> p_functions;
+  std::vector<std::shared_ptr<FunctionWrapperBase>> p_functions;
   std::vector<ClassInfo> p_classes_meta_data;
   std::vector<FunctionInfo> p_functions_meta_data;
   std::vector<ConstantInfo> p_constants;
@@ -330,10 +362,9 @@ class ClassWrapper {
   template <typename... Args>
   ClassWrapper<T> &constructor() {
     auto &curr_class = p_package.p_classes_meta_data.back();
-    curr_class.constructor = nullptr;
-    // Use is_method as a flag to distinguish between constructor
+    // Use name as a flag to distinguish between constructor
     // and normal methods
-    p_package.defun("", detail::create_class<T, Args...>, false,
+    p_package.defun("", detail::create_class<T, true, Args...>, true,
                     curr_class.name);
     return *this;
   }
@@ -394,11 +425,11 @@ class ClassWrapper {
 
 }  // namespace clcxx
 extern "C" {
-CLCXX_API void clcxx_init(void (*error_handler)(char *),
+CLCXX_API bool clcxx_init(void (*error_handler)(char *),
                           void (*reg_data_callback)(clcxx::MetaData *,
                                                     uint8_t));
-CLCXX_API void remove_package(char *pack_name);
-CLCXX_API void register_package(const char *cl_pack,
+CLCXX_API bool remove_package(char *pack_name);
+CLCXX_API bool register_package(const char *cl_pack,
                                 void (*regfunc)(clcxx::Package &));
 }
 

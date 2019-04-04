@@ -5,26 +5,30 @@
 
 extern "C" {
 
-CLCXX_API void clcxx_init(void (*error_handler)(char *),
+CLCXX_API bool clcxx_init(void (*error_handler)(char *),
                           void (*reg_data_callback)(clcxx::MetaData *,
                                                     uint8_t)) {
   try {
     clcxx::registry().set_error_handler(error_handler);
     clcxx::registry().set_meta_data_handler(reg_data_callback);
+    return true;
   } catch (const std::runtime_error &err) {
     clcxx::lisp_error(const_cast<char *>(err.what()));
   }
+  return false;
 }
 
-CLCXX_API void remove_package(char *pack_name) {
+CLCXX_API bool remove_package(char *pack_name) {
   try {
     clcxx::registry().remove_package(pack_name);
+    return true;
   } catch (const std::runtime_error &err) {
     clcxx::lisp_error(const_cast<char *>(err.what()));
   }
+  return false;
 }
 
-CLCXX_API void register_package(const char *cl_pack,
+CLCXX_API bool register_package(const char *cl_pack,
                                 void (*regfunc)(clcxx::Package &)) {
   try {
     clcxx::Package &pack = clcxx::registry().create_package(cl_pack);
@@ -51,8 +55,10 @@ CLCXX_API void register_package(const char *cl_pack,
     }
     pack.functions_meta_data().clear();
     clcxx::registry().reset_current_package();
+    return true;
   } catch (const std::runtime_error &err) {
     clcxx::lisp_error(const_cast<char *>(err.what()));
   }
+  return false;
 }
 }

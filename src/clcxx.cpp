@@ -25,7 +25,7 @@ char *str_dup(const char *src) {
   } catch (std::bad_alloc &err) {
     lisp_error(err.what());
   }
-  return nullptr; 
+  return nullptr;
 }
 
 char *str_append(char *old_str, const char *src) {
@@ -96,7 +96,7 @@ std::string class_name(std::type_index i) {
   return registry().current_package().classes()[i];
 }
 
-std::vector<std::shared_ptr<const void *>> PackageRegistry::functions() {
+std::vector<std::shared_ptr<FunctionWrapperBase>> PackageRegistry::functions() {
   return PackageRegistry::current_package().functions();
 }
 
