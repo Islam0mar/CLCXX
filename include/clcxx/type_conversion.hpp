@@ -36,32 +36,73 @@ extern "C" typedef struct {
   ComplexType imag;
 } LispComplex;
 
+template <typename T>
+struct IsPOD {
+  static constexpr bool value =
+      (std::is_trivial<T>::value && std::is_standard_layout<T>::value) &&
+      (std::is_class<T>::value);
+};
+
+template <typename T>
+struct IsFundamental {
+  static constexpr bool value = std::is_fundamental<T>::value ||
+                                (std::is_array<T>::value && IsPOD<T>::value);
+};
+
+template <typename T>
+struct IsComplex {
+  static constexpr bool value = std::is_same<T, std::complex<float>>::value ||
+                                std::is_same<T, std::complex<double>>::value;
+};
+
+template <typename T>
+struct IsString {
+  static constexpr bool value = std::is_same<T, std::string>::value;
+};
+
+template <typename T>
+struct IsClass {
+  static constexpr bool value =
+      !(std::is_same<T, std::string>::value ||
+        std::is_same<T, std::complex<float>>::value ||
+        std::is_same<T, std::complex<double>>::value) &&
+      std::is_class<T>::value;
+};
+
 namespace detail {
 
-template <typename T> struct unused_type {};
+template <bool, typename T1, typename T2>
+struct StaticIf;
 
-template <typename T1, typename T2> struct DefineIfDifferent {
+// non-bits
+template <typename T1, typename T2>
+struct StaticIf<false, T1, T2> {
+  typedef T2 type;
+};
+
+// bits type
+template <typename T1, typename T2>
+struct StaticIf<true, T1, T2> {
   typedef T1 type;
 };
 
-template <typename T> struct DefineIfDifferent<T, T> {
+template <typename T>
+struct unused_type {};
+
+template <typename T1, typename T2>
+struct DefineIfDifferent {
+  typedef T1 type;
+};
+
+template <typename T>
+struct DefineIfDifferent<T, T> {
   typedef unused_type<T> type;
 };
 
 template <typename T1, typename T2>
 using define_if_different = typename DefineIfDifferent<T1, T2>::type;
 
-// Helper to deal with references
-template <typename T> struct LispReferenceMapping { typedef T type; };
-
-template <typename T> struct LispReferenceMapping<T &> { typedef T type; };
-
-template <typename T> struct LispReferenceMapping<const T &> {
-  typedef T type;
-};
-
-template <typename T> struct LispReferenceMapping<const T> { typedef T type; };
-} // namespace detail
+}  // namespace detail
 
 /// Remove reference and const from a type
 template <typename T>
@@ -69,36 +110,17 @@ using remove_const_ref =
     typename std::remove_const<typename std::remove_reference<T>::type>::type;
 
 ////
-
-template <typename T> struct IsPOD {
-  static constexpr bool value =
-      (std::is_trivial<T>::value && std::is_standard_layout<T>::value) &&
-      (std::is_class<T>::value);
-};
-
-template <typename T> struct IsFundamental {
-  static constexpr bool value = std::is_fundamental<T>::value ||
-                                (std::is_array<T>::value && IsPOD<T>::value);
-};
-
-template <typename T> struct NeedBox {
-  static constexpr bool value =
-      std::is_same<T, std::complex<float>>::value ||
-      std::is_same<T, std::complex<double>>::value ||
-      // std::is_same<T, std::complex<long double>>::value ||
-      std::is_pointer<T>::value;
-};
-
-template <typename T> struct static_type_mapping {
-  typedef typename std::conditional<IsPOD<remove_const_ref<T>>::value, T,
-                                    void *>::type type;
-  // typedef void *type;
+/// Convenience function to get the lisp data type associated with T
+template <typename T>
+struct static_type_mapping {
+  typedef typename std::conditional<IsPOD<T>::value, T, void *>::type type;
   static std::string lisp_type() {
-    if (!std::is_class<T>::value) {
-      throw std::runtime_error("Type " + std::string(typeid(T).name()) +
-                               " has no lisp wrapper");
-    }
-    if (IsPOD<remove_const_ref<T>>::value) {
+    static_assert(std::is_class<T>::value, "Unkown type");
+    // if (!std::is_class<T>::value && !(std::is_same<T,std::string>::value)) {
+    //   throw std::runtime_error("Type " + std::string(typeid(T).name()) +
+    //                            " has no lisp wrapper");
+    // }
+    if (IsPOD<T>::value) {
       return std::string("(:struct " + class_name(std::type_index(typeid(T))) +
                          ")");
     }
@@ -108,191 +130,242 @@ template <typename T> struct static_type_mapping {
 };
 
 template <typename SourceT>
-using dereference_for_mapping =
-    typename detail::LispReferenceMapping<SourceT>::type;
+using dereferenced_type_mapping = static_type_mapping<SourceT>;
 template <typename SourceT>
-using dereferenced_type_mapping =
-    static_type_mapping<dereference_for_mapping<SourceT>>;
-template <typename SourceT>
-// TODO:
 using mapped_lisp_type = typename dereferenced_type_mapping<SourceT>::type;
 
 namespace detail {
-template <typename T> struct MappedReferenceType {
-  typedef typename std::remove_const<T>::type type;
+template <typename T>
+struct MappedReferenceType {
+  // typedef typename std::remove_const<T>::type type;
+  typedef T type;
 };
 
-template <typename T> struct MappedReferenceType<T &> { typedef T &type; };
+// template <typename T>
+// struct MappedReferenceType<T &> {
+//   typedef T *type;
+// };
 
-template <typename T> struct MappedReferenceType<const T &> {
-  typedef const T &type;
-};
-} // namespace detail
+// template <typename T>
+// struct MappedReferenceType<const T &> {
+//   typedef const T *type;
+// };
+}  // namespace detail
 
 /// Remove reference and const from value types only, pass-through otherwise
 template <typename T>
 using mapped_reference_type = typename detail::MappedReferenceType<T>::type;
 
-template <> struct static_type_mapping<char> {
+template <>
+struct static_type_mapping<char> {
   typedef char type;
-  static std::string lisp_type() { return ":Char"; }
+  static std::string lisp_type() { return ":char"; }
 };
-// template <> struct static_type_mapping<unsigned char> {
-//   typedef unsigned char type;
-//   static std::string lisp_type() { return ":UChar"; }
-// };
-// template <> struct static_type_mapping<short> {
-//   typedef short type;
-//   static std::string lisp_type() { return ":Short"; }
-// };
-// template <> struct static_type_mapping<unsigned short> {
-//   typedef unsigned short type;
-//   static std::string lisp_type() { return ":UShort"; }
-// };
-// template <> struct static_type_mapping<int> {
-//   typedef int type;
-//   static std::string lisp_type() { return ":Int"; }
-// };
-// template <> struct static_type_mapping<unsigned int> {
-//   typedef unsigned int type;
-//   static std::string lisp_type() { return ":UInt"; }
-// };
-// template <> struct static_type_mapping<long> {
-//   typedef long type;
-//   static std::string lisp_type() { return ":Long"; }
-// };
-// template <> struct static_type_mapping<unsigned long> {
-//   typedef unsigned long type;
-//   static std::string lisp_type() { return ":ULong"; }
-// };
-template <> struct static_type_mapping<long long> {
+template <>
+struct static_type_mapping<
+    detail::define_if_different<unsigned char, uint8_t>> {
+  typedef unsigned char type;
+  static std::string lisp_type() { return ":uchar"; }
+};
+template <>
+struct static_type_mapping<detail::define_if_different<short, int16_t>> {
+  typedef short type;
+  static std::string lisp_type() { return ":short"; }
+};
+template <>
+struct static_type_mapping<
+    detail::define_if_different<unsigned short, uint16_t>> {
+  typedef unsigned short type;
+  static std::string lisp_type() { return ":ushort"; }
+};
+template <>
+struct static_type_mapping<detail::define_if_different<int, int32_t>> {
+  typedef int type;
+  static std::string lisp_type() { return ":int"; }
+};
+template <>
+struct static_type_mapping<
+    detail::define_if_different<unsigned int, uint32_t>> {
+  typedef unsigned int type;
+  static std::string lisp_type() { return ":uint"; }
+};
+template <>
+struct static_type_mapping<detail::define_if_different<long, int64_t>> {
+  typedef long type;
+  static std::string lisp_type() { return ":long"; }
+};
+template <>
+struct static_type_mapping<
+    detail::define_if_different<unsigned long, uint64_t>> {
+  typedef unsigned long type;
+  static std::string lisp_type() { return ":ulong"; }
+};
+template <>
+struct static_type_mapping<detail::define_if_different<long long, int64_t>> {
   typedef long long type;
-  static std::string lisp_type() { return ":LLong"; }
+  static std::string lisp_type() { return ":llong"; }
 };
-template <> struct static_type_mapping<unsigned long long> {
+template <>
+struct static_type_mapping<
+    detail::define_if_different<unsigned long long, uint64_t>> {
   typedef unsigned long long type;
-  static std::string lisp_type() { return ":ULLong"; }
+  static std::string lisp_type() { return ":ullong"; }
 };
-template <> struct static_type_mapping<int8_t> {
+template <>
+struct static_type_mapping<int8_t> {
   typedef int8_t type;
-  static std::string lisp_type() { return ":Int8"; }
+  static std::string lisp_type() { return ":int8"; }
 };
-template <> struct static_type_mapping<uint8_t> {
+template <>
+struct static_type_mapping<uint8_t> {
   typedef uint8_t type;
-  static std::string lisp_type() { return ":Uint8"; }
+  static std::string lisp_type() { return ":uint8"; }
 };
-template <> struct static_type_mapping<int16_t> {
+template <>
+struct static_type_mapping<int16_t> {
   typedef int16_t type;
-  static std::string lisp_type() { return ":Int16"; }
+  static std::string lisp_type() { return ":int16"; }
 };
-template <> struct static_type_mapping<uint16_t> {
+template <>
+struct static_type_mapping<uint16_t> {
   typedef uint16_t type;
-  static std::string lisp_type() { return ":Uint16"; }
+  static std::string lisp_type() { return ":uint16"; }
 };
-template <> struct static_type_mapping<int32_t> {
+template <>
+struct static_type_mapping<int32_t> {
   typedef int32_t type;
-  static std::string lisp_type() { return ":Int32"; }
+  static std::string lisp_type() { return ":int32"; }
 };
-template <> struct static_type_mapping<uint32_t> {
+template <>
+struct static_type_mapping<uint32_t> {
   typedef uint32_t type;
-  static std::string lisp_type() { return ":Uint32"; }
+  static std::string lisp_type() { return ":uint32"; }
 };
-template <> struct static_type_mapping<int64_t> {
+template <>
+struct static_type_mapping<int64_t> {
   typedef int64_t type;
-  static std::string lisp_type() { return ":Int64"; }
+  static std::string lisp_type() { return ":int64"; }
 };
-template <> struct static_type_mapping<uint64_t> {
+template <>
+struct static_type_mapping<uint64_t> {
   typedef uint64_t type;
-  static std::string lisp_type() { return ":Uint64"; }
+  static std::string lisp_type() { return ":uint64"; }
 };
-template <> struct static_type_mapping<float> {
+template <>
+struct static_type_mapping<float> {
   typedef float type;
-  static std::string lisp_type() { return ":Float"; }
+  static std::string lisp_type() { return ":float"; }
 };
-template <> struct static_type_mapping<double> {
+template <>
+struct static_type_mapping<double> {
   typedef double type;
-  static std::string lisp_type() { return ":Double"; }
+  static std::string lisp_type() { return ":double"; }
 };
 // template <> struct static_type_mapping<long double> {
 //   typedef long double type;
-//   static std::string lisp_type() { return ":Long-Double"; }
+//   static std::string lisp_type() { return ":long-double"; }
 // };
-template <typename T> struct static_type_mapping<T *> {
+
+template <typename T>
+struct static_type_mapping<T &> {
+  typedef void *type;
+  static std::string lisp_type() {
+    return std::string("(:reference " + static_type_mapping<T>::lisp_type() +
+                       ")");
+  }
+};
+
+template <typename T>
+struct static_type_mapping<T *> {
   typedef void *type;
   static std::string lisp_type() {
     return std::string("(:pointer " + static_type_mapping<T>::lisp_type() +
                        ")");
   }
 };
-template <typename T, std::size_t N> struct static_type_mapping<T (&)[N]> {
+template <typename T, std::size_t N>
+struct static_type_mapping<T (&)[N]> {
   typedef T type[N];
   static std::string lisp_type() {
-    return std::string("(array " + static_type_mapping<T>::lisp_type() + " " +
+    return std::string("(:array " + static_type_mapping<T>::lisp_type() + " " +
                        N + ")");
   }
 };
-template <typename T, std::size_t N> struct static_type_mapping<T (*)[N]> {
+template <typename T, std::size_t N>
+struct static_type_mapping<T (*)[N]> {
   typedef T type[N];
   static std::string lisp_type() {
-    return std::string("(array " + static_type_mapping<T>::lisp_type() + " " +
+    return std::string("(:array " + static_type_mapping<T>::lisp_type() + " " +
                        N + ")");
   }
 };
 
-template <> struct static_type_mapping<bool> {
+template <>
+struct static_type_mapping<bool> {
   typedef bool type;
-  static std::string lisp_type() { return ":Bool"; }
+  static std::string lisp_type() { return ":bool"; }
 };
-template <> struct static_type_mapping<const char *> {
+template <>
+struct static_type_mapping<const char *> {
   typedef const char *type;
   static std::string lisp_type() { return ":string"; }
 };
-template <> struct static_type_mapping<std::string> {
+template <>
+struct static_type_mapping<std::string> {
   typedef const char *type;
   static std::string lisp_type() { return ":string"; }
 };
-template <> struct static_type_mapping<void> {
+template <>
+struct static_type_mapping<void> {
   typedef void type;
   static std::string lisp_type() { return ":void"; }
 };
 
-template <> struct static_type_mapping<std::complex<float>> {
+template <>
+struct static_type_mapping<std::complex<float>> {
   typedef LispComplex type;
   static std::string lisp_type() {
-    return std::string("(:pointer " + std::string("(:complex ") +
+    return std::string(std::string("(:complex ") +
                        static_type_mapping<float>::lisp_type() + "))");
   }
 };
 
-template <> struct static_type_mapping<std::complex<double>> {
+template <>
+struct static_type_mapping<std::complex<double>> {
   typedef LispComplex type;
   static std::string lisp_type() {
-    return std::string("(:pointer " + std::string("(:complex ") +
+    return std::string(std::string("(:complex ") +
                        static_type_mapping<double>::lisp_type() + "))");
   }
 };
 
-/// Convenience function to get the lisp data type associated with T
-template <typename T> inline std::string lisp_type() {
+template <typename T>
+inline std::string lisp_type() {
   return static_type_mapping<T>::lisp_type();
 }
 // ------------------------------------------------------------------//
 // Box an automatically converted value
 /// Wrap a C++ pointer in a lisp type that contains a single void pointer field,
-template <typename CppT, typename LispType> inline LispType box(CppT cpp_val) {
+template <typename CppT, typename LispType = void *>
+inline LispType box(CppT cpp_val) {
   return reinterpret_cast<void *>(cpp_val);
 }
 
-template <> inline const char *box(const char *str) { return str; }
+template <>
+inline const char *box(const char *str) {
+  return str;
+}
 
-template <> inline LispComplex box(std::complex<float> x) {
+template <>
+inline LispComplex box(std::complex<float> x) {
   LispComplex c;
   c.real.Float = std::real(x);
   c.imag.Float = std::imag(x);
   return c;
 }
 
-template <> inline LispComplex box(std::complex<double> x) {
+template <>
+inline LispComplex box(std::complex<double> x) {
   LispComplex c;
   c.real.Double = std::real(x);
   c.imag.Double = std::imag(x);
@@ -307,17 +380,24 @@ template <> inline LispComplex box(std::complex<double> x) {
 // }
 
 // unbox -----------------------------------------------------------------//
-template <typename CppT, typename LispT> CppT unbox(LispT lisp_val) {
+/// pointers
+template <typename CppT, typename LispT = void *>
+CppT unbox(LispT lisp_val) {
   return reinterpret_cast<CppT>(lisp_val);
 }
 
-template <> inline const char *unbox(const char *v) { return v; }
+template <>
+inline const char *unbox(const char *v) {
+  return v;
+}
 
-template <> inline std::complex<float> unbox(LispComplex v) {
+template <>
+inline std::complex<float> unbox(LispComplex v) {
   return std::complex<float>(v.real.Float, v.imag.Float);
 }
 
-template <> inline std::complex<double> unbox(LispComplex v) {
+template <>
+inline std::complex<double> unbox(LispComplex v) {
   return std::complex<double>(v.real.Double, v.imag.Double);
 }
 
@@ -327,95 +407,161 @@ template <> inline std::complex<double> unbox(LispComplex v) {
 
 /////////////////////////////////////
 
-// to CPP
-template <typename CppT, bool Fundamental = false, bool box = false,
-          bool POD = false, bool Class = false, typename Enable = void>
+// Base template for converting to CPP
+template <typename CppT, typename Enable = void>
 struct ConvertToCpp {
-  template <typename lispT> CppT operator()(lispT x);
+  template <typename lispT>
+  CppT *operator()(lispT &&) {
+    static_assert(sizeof(CppT) == 0,
+                  "No appropriate specialization for ConvertToCpp");
+    return nullptr;
+  }
 };
 
 // Fundamental type conversion
-template <typename CppT> struct ConvertToCpp<CppT, true> {
+template <typename CppT>
+struct ConvertToCpp<CppT,
+                    typename std::enable_if<IsFundamental<CppT>::value>::type> {
   CppT operator()(CppT lisp_val) const { return lisp_val; }
 };
 
-// complex and pointers type conversion
-template <typename CppT> struct ConvertToCpp<CppT, false, true> {
+// reference conversion
+template <typename CppT>
+struct ConvertToCpp<
+    CppT, typename std::enable_if<std::is_reference<CppT>::value>::type> {
+  using LispT = typename static_type_mapping<CppT>::type;
+  CppT operator()(LispT lisp_val) const {
+    auto obj_ptr =
+        reinterpret_cast<typename std::remove_reference<CppT>::type *>(
+            lisp_val);
+    return *obj_ptr;
+  }
+};
+
+// pointers conversion
+template <typename CppT>
+struct ConvertToCpp<
+    CppT, typename std::enable_if<std::is_pointer<CppT>::value>::type> {
   using LispT = typename static_type_mapping<CppT>::type;
   CppT operator()(LispT lisp_val) const { return unbox<CppT, LispT>(lisp_val); }
 };
-template <typename CppT> struct ConvertToCpp<CppT, false, true, false, true> {
+
+// complex numbers types
+template <typename CppT>
+struct ConvertToCpp<CppT,
+                    typename std::enable_if<IsComplex<CppT>::value>::type> {
   using LispT = typename static_type_mapping<CppT>::type;
   CppT operator()(LispT lisp_val) const { return unbox<CppT, LispT>(lisp_val); }
 };
 
 // strings
-template <> struct ConvertToCpp<std::string, false, false, false, true> {
+template <typename CppT>
+struct ConvertToCpp<CppT,
+                    typename std::enable_if<IsString<CppT>::value>::type> {
   std::string operator()(const char *str) const {
-    return std::string(ConvertToCpp<const char *, false, true>()(str));
+    return std::string(ConvertToCpp<const char *>()(str));
   }
 };
 
 // struct
-template <typename T> struct ConvertToCpp<T, false, false, true, true> {
-  T operator()(T pod_struct) const { return pod_struct; }
+template <typename CppT>
+struct ConvertToCpp<CppT, typename std::enable_if<IsPOD<CppT>::value>::type> {
+  CppT operator()(CppT pod_struct) const { return pod_struct; }
 };
 
 // class
-template <typename T> struct ConvertToCpp<T, false, false, false, true> {
-  T operator()(void *class_ptr) const {
-    auto cpp_class_ptr = reinterpret_cast<T *>(class_ptr);
+template <typename CppT>
+struct ConvertToCpp<CppT, typename std::enable_if<IsClass<CppT>::value>::type> {
+  CppT operator()(void *class_ptr) const {
+    auto cpp_class_ptr = reinterpret_cast<CppT *>(class_ptr);
     return *cpp_class_ptr;
   }
 };
 
-// To lisp
-template <typename CppT, bool Fundamental = false, bool box = false,
-          bool POD = false, bool Class = false, typename Enable = void>
+// Base template for converting To lisp
+template <typename CppT, typename Enable = void>
 struct ConvertToLisp {
-  template <typename LispT> LispT operator()(CppT cpp_val);
+  template <typename LispT>
+  LispT *operator()(CppT &&) {
+    static_assert(sizeof(CppT) == 0,
+                  "No appropriate specialization for ConvertToCpp");
+    return nullptr;
+  }
 };
 
-template <typename T> struct ConvertToLisp<T, true> {
-  T operator()(T cpp_val) const { return cpp_val; }
+// Fundamental type conversion
+template <typename CppT>
+struct ConvertToLisp<
+    CppT, typename std::enable_if<IsFundamental<CppT>::value>::type> {
+  CppT operator()(CppT cpp_val) const { return cpp_val; }
 };
 
-// complex and pointers
-template <typename CppT> struct ConvertToLisp<CppT, false, true> {
+// Reference conversion
+template <typename CppT>
+struct ConvertToLisp<
+    CppT, typename std::enable_if<std::is_reference<CppT>::value>::type> {
+  using LispT = typename static_type_mapping<CppT>::type;
+  LispT operator()(CppT cpp_val) const {
+    return reinterpret_cast<LispT>(&cpp_val);
+  }
+};
+
+// pointers conversion
+template <typename CppT>
+struct ConvertToLisp<
+    CppT, typename std::enable_if<std::is_pointer<CppT>::value>::type> {
   using LispT = typename static_type_mapping<CppT>::type;
   LispT operator()(CppT cpp_val) const { return box<CppT, LispT>(cpp_val); }
 };
-template <typename CppT> struct ConvertToLisp<CppT, false, true, false, true> {
+
+// complex numbers types
+template <typename CppT>
+struct ConvertToLisp<CppT,
+                     typename std::enable_if<IsComplex<CppT>::value>::type> {
   using LispT = typename static_type_mapping<CppT>::type;
   LispT operator()(CppT cpp_val) const { return box<CppT, LispT>(cpp_val); }
 };
 
 // Srings
-template <> struct ConvertToLisp<std::string, false, false, false, true> {
+template <typename CppT>
+struct ConvertToLisp<CppT,
+                     typename std::enable_if<IsString<CppT>::value>::type> {
+  // struct ConvertToLisp<CppT, typename std::enable_if<
+  //                                std::is_same<CppT,
+  //                                std::string>::value>::type> {
   const char *operator()(const std::string &str) const {
-    return ConvertToLisp<const char *, false, true>()(str.c_str());
+    return ConvertToLisp<const char *>()(str.c_str());
   }
 };
 
-template <> struct ConvertToLisp<std::string *, false, true> {
-  const char *operator()(const std::string *str) const {
-    return ConvertToLisp<std::string, false, false, false, true>()(*str);
-  }
-};
+// template <typename CppT>
+// struct ConvertToLisp<
+//     CppT,
+//     typename std::enable_if<std::is_same<CppT, std::string *>::value>::type>
+//     {
+//   const char *operator()(const std::string *str) const {
+//     return ConvertToLisp<std::string>()(*str);
+//   }
+// };
 
-template <> struct ConvertToLisp<const std::string *, false, true> {
-  const char *operator()(const std::string *str) const {
-    return ConvertToLisp<std::string, false, false, false, true>()(*str);
-  }
-};
+// template <typename CppT>
+// struct ConvertToLisp<CppT, typename std::enable_if<std::is_same<
+//                                CppT, const std::string *>::value>::type> {
+//   const char *operator()(const std::string *str) const {
+//     return ConvertToLisp<std::string>()(*str);
+//   }
+// };
 
 // struct
-template <typename CppT> struct ConvertToLisp<CppT, false, false, true, true> {
+template <typename CppT>
+struct ConvertToLisp<CppT, typename std::enable_if<IsPOD<CppT>::value>::type> {
   CppT operator()(CppT pod_struct) const { return pod_struct; }
 };
 
-// class
-template <typename CppT> struct ConvertToLisp<CppT, false, false, false, true> {
+// class exclude std::string
+template <typename CppT>
+struct ConvertToLisp<CppT,
+                     typename std::enable_if<IsClass<CppT>::value>::type> {
   void *operator()(CppT cpp_class) const {
     auto class_ptr = new CppT(cpp_class);
     return reinterpret_cast<void *>(class_ptr);
@@ -423,24 +569,25 @@ template <typename CppT> struct ConvertToLisp<CppT, false, false, false, true> {
 };
 
 namespace detail {
-template <typename T> struct StrippedConversionType {
+template <typename T>
+struct StrippedConversionType {
   typedef mapped_reference_type<T> type;
 };
 
-template <typename T> struct StrippedConversionType<T *&> { typedef T *type; };
+// template <typename T>
+// struct StrippedConversionType<T *&> {
+//   typedef T **type;
+// };
 
-template <typename T> struct StrippedConversionType<T *const &> {
-  typedef T *type;
-};
-} // namespace detail
+// template <typename T>
+// struct StrippedConversionType<T *const &> {
+//   typedef const T **type;
+// };
+}  // namespace detail
 
 template <typename T>
 using lisp_converter_type =
-    ConvertToLisp<typename detail::StrippedConversionType<T>::type,
-                  IsFundamental<remove_const_ref<T>>::value,
-                  NeedBox<remove_const_ref<T>>::value,
-                  IsPOD<remove_const_ref<T>>::value,
-                  std::is_class<remove_const_ref<T>>::value>;
+    ConvertToLisp<typename detail::StrippedConversionType<T>::type>;
 
 /// Conversion to the statically mapped target type.
 template <typename T>
@@ -450,11 +597,7 @@ inline auto convert_to_lisp(T &&cpp_val)
 }
 
 template <typename T>
-using cpp_converter_type =
-    ConvertToCpp<T, IsFundamental<remove_const_ref<T>>::value,
-                 NeedBox<remove_const_ref<T>>::value,
-                 IsPOD<remove_const_ref<T>>::value,
-                 std::is_class<remove_const_ref<T>>::value>;
+using cpp_converter_type = ConvertToCpp<T>;
 
 /// Conversion to C++
 template <typename CppT, typename LispT>
@@ -462,4 +605,4 @@ inline CppT convert_to_cpp(const LispT &lisp_val) {
   return cpp_converter_type<CppT>()(lisp_val);
 }
 
-} // namespace clcxx
+}  // namespace clcxx

@@ -26,6 +26,6 @@ CLCXX_PACKAGE TEST(clcxx::Package &pack) {
   pack.defun("greet", &greet);
   pack.defun("float", &Float);
   pack.defun("complex", &gr);
-  pack.defclass<xx>("xx").method("foo", &xx::greet);
+  pack.defclass<xx>("xx").defmethod("foo", &xx::greet);
 }
 

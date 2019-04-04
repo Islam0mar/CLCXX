@@ -41,15 +41,16 @@
 ;;   char *super_classes;
 ;;   char *slot_names;
 ;;   char *slot_types;
-;;   void *finalize;
+;;   void *constructor;
+;;   void *destructor;
 ;; } ClassInfo;
 (defcstruct class-info
   (name :string)
   (super-classes :string)
   (slot-names :string)
   (slot-types :string)
-  (finalize :pointer))
-
+  (constructor :pointer)
+  (destructor :pointer))
 ;; extern "C" typedef struct {
 ;;   char *name;
 ;;   bool method_p;
@@ -95,9 +96,9 @@
   (ecase type
     (0 (print "class")
        (print meta-ptr)
-       (with-foreign-slots ((name super-classes slot-names slot-types finalize) meta-ptr (:struct class-info))
-         (format t "name:~A super-classes:~A slot-names:~A slot-types:~A finalize:~A~%"
-                 name super-classes slot-names slot-types finalize)))
+       (with-foreign-slots ((name super-classes slot-names slot-types constructor destructor) meta-ptr (:struct class-info))
+         (format t "name:~A super-classes:~A slot-names:~A slot-types:~A constructor:~A destructor:~A~%"
+                 name super-classes slot-names slot-types  constructor destructor)))
     (1 (print "constant")
        (print meta-ptr)
        (with-foreign-slots ((name value) meta-ptr (:struct constant-info))
@@ -121,7 +122,7 @@
 
 ;; void register_lisp_package(const char *cl_pack,
 ;;                                  void (*regfunc)(clcxx::Package &))
-(defcfun ("register_lisp_package" register-package) :void
+(defcfun ("register_package" register-package) :void
   (name :string)
   (pack-ptr :pointer))
 

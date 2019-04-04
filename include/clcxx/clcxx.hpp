@@ -4,15 +4,11 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <string>
 #include <sstream>
-#include <typeinfo>
+#include <string>
 #include <typeindex>
+#include <typeinfo>
 #include <vector>
 
-// #include "array.hpp"
 #include "package.hpp"
-// #include "smart_pointers.hpp"
 #include "type_conversion.hpp"
-
-

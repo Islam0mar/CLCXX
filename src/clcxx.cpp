@@ -12,52 +12,82 @@ namespace detail {
 
 char *str_dup(const char *src) {
   try {
+    if (src == nullptr) {
+      return nullptr;
+    }
     size_t len = strlen(src) + 1;
     if (len > 1) {
-      char *s = new char[len];
-      memcpy(s, src, len);
-      return s;
+      char *new_str = new char[len];
+      memcpy(new_str, src, len);
+      return new_str;
     }
     return nullptr;
+  } catch (std::bad_alloc &err) {
+    lisp_error(err.what());
+  }
+  return nullptr; 
+}
+
+char *str_append(char *old_str, const char *src) {
+  try {
+    if (old_str == nullptr) {
+      return str_dup(src);
+    }
+    if (src == nullptr) {
+      return old_str;
+    }
+    size_t len = strlen(src) + 1;
+    if (len > 1) {
+      size_t len_old = strlen(old_str);
+      char *new_str = new char[len + len_old];
+      memcpy(new_str, old_str, len_old);
+      delete[] old_str;
+      strcat(new_str, src);
+      return new_str;
+    }
+    return old_str;
   } catch (std::bad_alloc &err) {
     lisp_error(err.what());
   }
   return nullptr;
 }
 
-inline void Free(char *f) {
+inline void delete_char_array(char *f) {
   if (!(f == nullptr)) {
     delete[] f;
   }
 }
-template <> void Remove(ClassInfo obj) {
-  Free(obj.name);
-  Free(obj.super_classes);
-  Free(obj.slot_types);
-  Free(obj.slot_names);
+template <>
+void remove_c_strings(ClassInfo obj) {
+  delete_char_array(obj.name);
+  delete_char_array(obj.super_classes);
+  delete_char_array(obj.slot_types);
+  delete_char_array(obj.slot_names);
 }
-template <> void Remove(FunctionInfo obj) {
-  Free(obj.name);
-  Free(obj.class_obj);
-  Free(obj.arg_types);
-  Free(obj.return_type);
+template <>
+void remove_c_strings(FunctionInfo obj) {
+  delete_char_array(obj.name);
+  delete_char_array(obj.class_obj);
+  delete_char_array(obj.arg_types);
+  delete_char_array(obj.return_type);
 }
-template <> void Remove(ConstantInfo obj) {
-  Free(obj.name);
-  Free(obj.value);
+template <>
+void remove_c_strings(ConstantInfo obj) {
+  delete_char_array(obj.name);
+  delete_char_array(obj.value);
 }
-} // namespace detail
+}  // namespace detail
 
 void PackageRegistry::remove_package(std::string lpack) {
   Package &pack = get_package(lpack);
   for (const auto &Class : pack.classes_meta_data()) {
-    detail::Remove(Class);
+    detail::remove_c_strings(Class);
   }
   for (const auto &Constant : pack.constants_meta_data()) {
-    detail::Remove(Constant);
+    detail::remove_c_strings(Constant);
   }
   for (const auto &Func : pack.functions_meta_data()) {
-    detail::Remove(Func);
+    detail::remove_c_strings(Func);
   }
   p_packages.erase(lpack);
 }
@@ -90,4 +120,4 @@ CLCXX_API PackageRegistry &registry() {
   return p_registry;
 }
 
-} // namespace clcxx
+}  // namespace clcxx
