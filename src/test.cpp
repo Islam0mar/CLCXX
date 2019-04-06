@@ -24,10 +24,10 @@ void ref_class(xx& x) { x.y = 1000000; }
 
 CLCXX_PACKAGE TEST(clcxx::Package &pack) {
   pack.defun("hi", &hi);
-  pack.defun("int", &Int);
+  pack.defun("test-int", &Int);
   pack.defun("greet", &greet);
-  pack.defun("float", &Float);
-  pack.defun("complex", &gr);
+  pack.defun("test-float", &Float);
+  pack.defun("test-complex", &gr);
   pack.defun("ref-int", &ref_int);
   pack.defun("ref-class", &ref_class);
   pack.defclass<xx, false>("xx")

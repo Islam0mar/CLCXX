@@ -326,7 +326,7 @@ struct static_type_mapping<std::complex<float>> {
   typedef LispComplex type;
   static std::string lisp_type() {
     return std::string(std::string("(:complex ") +
-                       static_type_mapping<float>::lisp_type() + "))");
+                       static_type_mapping<float>::lisp_type() + ")");
   }
 };
 
@@ -335,7 +335,7 @@ struct static_type_mapping<std::complex<double>> {
   typedef LispComplex type;
   static std::string lisp_type() {
     return std::string(std::string("(:complex ") +
-                       static_type_mapping<double>::lisp_type() + "))");
+                       static_type_mapping<double>::lisp_type() + ")");
   }
 };
 
