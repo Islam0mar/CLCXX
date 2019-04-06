@@ -47,6 +47,8 @@ extern "C" typedef union {
 
 class CLCXX_API Package;
 
+inline void lisp_error(const char *error);
+
 namespace detail {
 
 char *str_dup(const char *src);
@@ -100,6 +102,7 @@ struct ReturnTypeAdapter<void, Args...> {
   inline void operator()(const void *functor, mapped_lisp_type<Args>... args) {
     auto std_func =
         reinterpret_cast<const std::function<void(Args...)> *>(functor);
+    lisp_error("nice3");
     assert(std_func != nullptr);
     (*std_func)(convert_to_cpp<mapped_reference_type<Args>>(args)...);
   }
@@ -144,7 +147,7 @@ class FunctionWrapper : public FunctionWrapperBase {
  public:
   typedef std::function<R(Args...)> functor_t;
 
-  FunctionWrapper(const functor_t &function) : p_function(function) {}
+  FunctionWrapper(const functor_t &f) { p_function = f; }
 
   const void *ptr() { return reinterpret_cast<const void *>(&p_function); }
 
@@ -177,7 +180,7 @@ class CLCXX_API PackageRegistry {
   bool has_current_package() { return p_current_package != nullptr; }
   Package &current_package();
   void reset_current_package() { p_current_package = nullptr; }
-  std::vector<std::shared_ptr<FunctionWrapperBase>> functions();
+  auto functions();
 
   ~PackageRegistry() {
     for (auto const &p : p_packages) {
@@ -253,10 +256,11 @@ class CLCXX_API Package {
     f_info.arg_types =
         detail::str_dup(detail::arg_types_string<Args...>().c_str());
     f_info.return_type = detail::str_dup(lisp_type<R>().c_str());
-    p_functions_meta_data.push_back(f_info);
-    auto *new_wrapper = new FunctionWrapper<R, Args...>(f);
+    auto new_wrapper = new FunctionWrapper<R, Args...>(f);
     p_functions.push_back(std::shared_ptr<FunctionWrapperBase>(new_wrapper));
     f_info.func_ptr = new_wrapper->ptr();
+    // store data
+    p_functions_meta_data.push_back(f_info);
   }
 
   /// Define a new function. Overload for pointers

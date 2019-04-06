@@ -96,7 +96,7 @@ std::string class_name(std::type_index i) {
   return registry().current_package().classes()[i];
 }
 
-std::vector<std::shared_ptr<FunctionWrapperBase>> PackageRegistry::functions() {
+auto PackageRegistry::functions() {
   return PackageRegistry::current_package().functions();
 }
 

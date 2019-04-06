@@ -353,7 +353,8 @@ inline LispType box(CppT cpp_val) {
 
 template <>
 inline const char *box(const char *str) {
-  return str;
+  const char * x = strdup(str);
+  return x;
 }
 
 template <>
@@ -422,7 +423,11 @@ struct ConvertToCpp {
 template <typename CppT>
 struct ConvertToCpp<CppT,
                     typename std::enable_if<IsFundamental<CppT>::value>::type> {
-  CppT operator()(CppT lisp_val) const { return lisp_val; }
+  using LispT = typename static_type_mapping<CppT>::type;
+  CppT operator()(LispT lisp_val) const {
+    static_assert(std::is_same<LispT, CppT>::value,
+                  "Fundamental type mismatch");
+    return lisp_val; }
 };
 
 // reference conversion
@@ -590,10 +595,14 @@ using lisp_converter_type =
     ConvertToLisp<typename detail::StrippedConversionType<T>::type>;
 
 /// Conversion to the statically mapped target type.
-template <typename T>
-inline auto convert_to_lisp(T &&cpp_val)
-    -> decltype(lisp_converter_type<T>()(std::forward<T>(cpp_val))) {
-  return lisp_converter_type<T>()(std::forward<T>(cpp_val));
+// template <typename T>
+// inline auto convert_to_lisp(T &&cpp_val)
+//     -> decltype(lisp_converter_type<T>()(std::forward<T>(cpp_val))) {
+//   return lisp_converter_type<T>()(std::forward<T>(cpp_val));
+// }
+template <typename CppT>
+inline auto convert_to_lisp(const CppT &cpp_val) {
+  return lisp_converter_type<CppT>()(cpp_val);
 }
 
 template <typename T>
