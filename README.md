@@ -19,15 +19,7 @@ This is a C++ library to be used with COMMON-LISP such as boost.python, PYBIND11
     cd build
     cmake ..
     make
+    make install
 ```
-
-then open sbcl
-
-```lisp
-(load #p"path/to/clcxx/src/test.lisp")
-
-(clcxx/test::add-package "test" "Test")
-```
-
 
 
