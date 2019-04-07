@@ -16,13 +16,12 @@ std::string greet() { return "Hello, World"; }
 int Int(int x) { return x + 100; }
 float Float(float y) { return y + 100.34; }
 auto gr(std::complex<float> x) { return x; }
-std::string hi(char *s) { return std::string("hi, " + std::string(s)); }
+std::string hi(char* s) { return std::string("hi, " + std::string(s)); }
 
 void ref_int(int& x) { x += 30; }
 void ref_class(xx& x) { x.y = 1000000; }
 
-
-CLCXX_PACKAGE TEST(clcxx::Package &pack) {
+CLCXX_PACKAGE TEST(clcxx::Package& pack) {
   pack.defun("hi", &hi);
   pack.defun("test-int", &Int);
   pack.defun("greet", &greet);
