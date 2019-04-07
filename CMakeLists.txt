@@ -5,7 +5,10 @@ project(clcxx)
 # ============
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+
+# Settings
+# ============
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_MODULE_PATH}/lib")
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set(CMAKE_VERBOSE_MAKEFILE 1)
 
@@ -102,5 +105,33 @@ set_property(TARGET ${CLCXX_TARGET} APPEND PROPERTY
 
 generate_export_header(${CLCXX_TARGET})
 
+# Installation
+# ============
+
+# Use this snippet *after* PROJECT(xxx):
+IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  SET(CMAKE_INSTALL_PREFIX "~/.local" CACHE PATH "install directory" FORCE)
+ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+
+set(JLCXX_CMAKECONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}" CACHE STRING "install path for clcxxConfig.cmake")
+
+
+install(TARGETS ${CLCXX_TARGET} EXPORT ClCxxTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/clcxx)
+
+# Uninstall
+# ==========
+if(NOT TARGET uninstall)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+        IMMEDIATE @ONLY)
+
+    add_custom_target(uninstall
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+endif()
 
 

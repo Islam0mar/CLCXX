@@ -93,7 +93,7 @@ struct ReturnTypeAdapter {
         reinterpret_cast<const std::function<R(Args...)> *>(functor);
     assert(std_func != nullptr);
     return convert_to_lisp(
-        (*std_func)(convert_to_cpp<mapped_reference_type<Args>>(args)...));
+        (*std_func)(convert_to_cpp<Args>(args)...));
   }
 };
 
@@ -104,7 +104,7 @@ struct ReturnTypeAdapter<void, Args...> {
         reinterpret_cast<const std::function<void(Args...)> *>(functor);
     lisp_error("nice3");
     assert(std_func != nullptr);
-    (*std_func)(convert_to_cpp<mapped_reference_type<Args>>(args)...);
+    (*std_func)(convert_to_cpp<Args>(args)...);
   }
 };
 
@@ -133,22 +133,6 @@ std::string super_classes_string() {
   return s;
 }
 
-template <typename... Args>
-struct NeedConvertHelper {
-  bool operator()() {
-    for (const bool b : {std::is_same<remove_const_ref<mapped_lisp_type<Args>>,
-                                      remove_const_ref<Args>>::value...}) {
-      if (!b) return true;
-    }
-    return false;
-  }
-};
-
-template <>
-struct NeedConvertHelper<> {
-  bool operator()() { return false; }
-};
-
 }  // namespace detail
 
 /// Abstract base class for storing any function
@@ -160,7 +144,7 @@ class FunctionWrapper : public FunctionWrapperBase {
  public:
   typedef std::function<R(Args...)> functor_t;
 
-  FunctionWrapper(const functor_t &f) { p_function = f; }
+  explicit FunctionWrapper(const functor_t &f) { p_function = f; }
 
   const void *ptr() { return reinterpret_cast<const void *>(&p_function); }
 
@@ -291,7 +275,7 @@ class CLCXX_API Package {
                is_method, class_name);
   }
 
-  /// Add a composite type
+  /// Add a class type
   template <typename T, bool Constructor = true, typename... s_classes>
   ClassWrapper<T> defclass(const std::string &name, s_classes... super) {
     ClassInfo c_info;
@@ -299,13 +283,11 @@ class CLCXX_API Package {
     c_info.destructor = reinterpret_cast<void *>(detail::remove_class<T>);
     c_info.slot_types = nullptr;
     c_info.slot_names = nullptr;
-    // store class name
     c_info.name = detail::str_dup(name.c_str());
-    // store class type
     class_name[std::type_index(typeid(T))] = name;
-    // get super classes names
     c_info.super_classes =
         detail::str_dup(detail::super_classes_string<s_classes...>().c_str());
+    // Store data
     p_classes_meta_data.push_back(c_info);
     return ClassWrapper<T>(*this);
   }
@@ -364,8 +346,7 @@ class ClassWrapper {
   template <typename... Args>
   ClassWrapper<T> &constructor() {
     auto &curr_class = p_package.p_classes_meta_data.back();
-    // Use name as a flag to distinguish between constructor
-    // and normal methods
+    // Use name as a flag
     p_package.defun(std::string(std::to_string(sizeof...(Args)) + "create-" +
                                 std::string(curr_class.name)),
                     detail::CppConstructor<T, Args...>, false, curr_class.name);

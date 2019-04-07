@@ -20,7 +20,7 @@ namespace clcxx {
 // POD structs are passed through libffi
 // structs,class are passed as pointers with *new*
 // (e.g. (:pointer :char))
-// (array :int 10)
+// (:array :int 10)
 // for nonPOD struct, class, pointer
 
 std::string class_name(std::type_index i);
@@ -104,11 +104,6 @@ using define_if_different = typename DefineIfDifferent<T1, T2>::type;
 
 }  // namespace detail
 
-/// Remove reference and const from a type
-template <typename T>
-using remove_const_ref =
-    typename std::remove_const<typename std::remove_reference<T>::type>::type;
-
 ////
 /// Convenience function to get the lisp data type associated with T
 template <typename T>
@@ -116,10 +111,6 @@ struct static_type_mapping {
   typedef typename std::conditional<IsPOD<T>::value, T, void *>::type type;
   static std::string lisp_type() {
     static_assert(std::is_class<T>::value, "Unkown type");
-    // if (!std::is_class<T>::value && !(std::is_same<T,std::string>::value)) {
-    //   throw std::runtime_error("Type " + std::string(typeid(T).name()) +
-    //                            " has no lisp wrapper");
-    // }
     if (IsPOD<T>::value) {
       return std::string("(:struct " + class_name(std::type_index(typeid(T))) +
                          ")");
@@ -133,28 +124,6 @@ template <typename SourceT>
 using dereferenced_type_mapping = static_type_mapping<SourceT>;
 template <typename SourceT>
 using mapped_lisp_type = typename dereferenced_type_mapping<SourceT>::type;
-
-namespace detail {
-template <typename T>
-struct MappedReferenceType {
-  // typedef typename std::remove_const<T>::type type;
-  typedef T type;
-};
-
-// template <typename T>
-// struct MappedReferenceType<T &> {
-//   typedef T *type;
-// };
-
-// template <typename T>
-// struct MappedReferenceType<const T &> {
-//   typedef const T *type;
-// };
-}  // namespace detail
-
-/// Remove reference and const from value types only, pass-through otherwise
-template <typename T>
-using mapped_reference_type = typename detail::MappedReferenceType<T>::type;
 
 template <>
 struct static_type_mapping<char> {
@@ -532,31 +501,10 @@ struct ConvertToLisp<CppT,
 template <typename CppT>
 struct ConvertToLisp<CppT,
                      typename std::enable_if<IsString<CppT>::value>::type> {
-  // struct ConvertToLisp<CppT, typename std::enable_if<
-  //                                std::is_same<CppT,
-  //                                std::string>::value>::type> {
   const char *operator()(const std::string &str) const {
     return ConvertToLisp<const char *>()(str.c_str());
   }
 };
-
-// template <typename CppT>
-// struct ConvertToLisp<
-//     CppT,
-//     typename std::enable_if<std::is_same<CppT, std::string *>::value>::type>
-//     {
-//   const char *operator()(const std::string *str) const {
-//     return ConvertToLisp<std::string>()(*str);
-//   }
-// };
-
-// template <typename CppT>
-// struct ConvertToLisp<CppT, typename std::enable_if<std::is_same<
-//                                CppT, const std::string *>::value>::type> {
-//   const char *operator()(const std::string *str) const {
-//     return ConvertToLisp<std::string>()(*str);
-//   }
-// };
 
 // struct
 template <typename CppT>
@@ -574,33 +522,9 @@ struct ConvertToLisp<CppT,
   }
 };
 
-namespace detail {
 template <typename T>
-struct StrippedConversionType {
-  typedef mapped_reference_type<T> type;
-};
+using lisp_converter_type = ConvertToLisp<T>;
 
-// template <typename T>
-// struct StrippedConversionType<T *&> {
-//   typedef T **type;
-// };
-
-// template <typename T>
-// struct StrippedConversionType<T *const &> {
-//   typedef const T **type;
-// };
-}  // namespace detail
-
-template <typename T>
-using lisp_converter_type =
-    ConvertToLisp<typename detail::StrippedConversionType<T>::type>;
-
-/// Conversion to the statically mapped target type.
-// template <typename T>
-// inline auto convert_to_lisp(T &&cpp_val)
-//     -> decltype(lisp_converter_type<T>()(std::forward<T>(cpp_val))) {
-//   return lisp_converter_type<T>()(std::forward<T>(cpp_val));
-// }
 template <typename CppT>
 inline auto convert_to_lisp(const CppT &cpp_val) {
   return lisp_converter_type<CppT>()(cpp_val);
