@@ -353,7 +353,7 @@ inline LispType box(CppT cpp_val) {
 
 template <>
 inline const char *box(const char *str) {
-  const char * x = strdup(str);
+  const char *x = strdup(str);
   return x;
 }
 
@@ -427,7 +427,8 @@ struct ConvertToCpp<CppT,
   CppT operator()(LispT lisp_val) const {
     static_assert(std::is_same<LispT, CppT>::value,
                   "Fundamental type mismatch");
-    return lisp_val; }
+    return lisp_val;
+  }
 };
 
 // reference conversion

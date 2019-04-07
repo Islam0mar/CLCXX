@@ -58,24 +58,24 @@ template <typename T>
 void remove_c_strings(T obj);
 
 // Base class to specialize for constructor
-template <typename CppT, bool DefaultConstructor, typename... Args>
-struct CppConstructor {
-  void *operator()(Args... args) const {
-    CppT *obj_ptr = new CppT(args...);
-    void *ptr = reinterpret_cast<void *>(obj_ptr);
-    return ptr;
+template <typename CppT, typename... Args>
+void *CppConstructor(Args... args) {
+  CppT *obj_ptr = new CppT(args...);
+  void *ptr = reinterpret_cast<void *>(obj_ptr);
+  return ptr;
+}
+
+template <typename T, bool Constructor = true, typename... Args>
+struct CreateClass {
+  inline void *operator()() {
+    return reinterpret_cast<void *>(CppConstructor<T, Args...>);
   }
 };
 
-template <typename CppT>
-struct CppConstructor<CppT, false> {
-  void *operator()() const { return nullptr; }
+template <typename T, typename... Args>
+struct CreateClass<T, false, Args...> {
+  inline void *operator()() { return nullptr; }
 };
-
-template <typename CppT, bool DefaultConstructor = true, typename... Args>
-void *create_class(Args... args) {
-  return CppConstructor<CppT, DefaultConstructor, Args...>()(args...);
-}
 
 template <typename T>
 void remove_class(void *ptr) {
@@ -115,6 +115,19 @@ std::string arg_types_string() {
   std::string s;
   for (auto arg_types : vec) {
     s.append(arg_types);
+    s.append("+");
+  }
+  return s;
+}
+
+/// Make a string with the super classes in the variadic template parameter
+/// pack
+template <typename... Args>
+std::string super_classes_string() {
+  std::vector<std::string> vec = {class_name(std::type_index(typeid(Args)))...};
+  std::string s;
+  for (auto super_types : vec) {
+    s.append(super_types);
     s.append("+");
   }
   return s;
@@ -282,8 +295,7 @@ class CLCXX_API Package {
   template <typename T, bool Constructor = true, typename... s_classes>
   ClassWrapper<T> defclass(const std::string &name, s_classes... super) {
     ClassInfo c_info;
-    c_info.constructor =
-        reinterpret_cast<void *>(detail::create_class<T, Constructor>);
+    c_info.constructor = detail::CreateClass<T, Constructor>()();
     c_info.destructor = reinterpret_cast<void *>(detail::remove_class<T>);
     c_info.slot_types = nullptr;
     c_info.slot_names = nullptr;
@@ -293,7 +305,7 @@ class CLCXX_API Package {
     class_name[std::type_index(typeid(T))] = name;
     // get super classes names
     c_info.super_classes =
-        detail::str_dup(super_classes_string<s_classes...>().c_str());
+        detail::str_dup(detail::super_classes_string<s_classes...>().c_str());
     p_classes_meta_data.push_back(c_info);
     return ClassWrapper<T>(*this);
   }
@@ -330,20 +342,6 @@ class CLCXX_API Package {
                  is_method, class_name);
   }
 
-  /// Make a string with the super classes in the variadic template parameter
-  /// pack
-  template <typename... Args>
-  std::string super_classes_string() {
-    std::vector<std::string> vec = {
-        class_name[std::type_index(typeid(Args))]...};
-    std::string s;
-    for (auto super_types : vec) {
-      s.append(super_types);
-      s.append("+");
-    }
-    return s;
-  }
-
   std::string p_cl_pack;
   std::vector<std::shared_ptr<FunctionWrapperBase>> p_functions;
   std::vector<ClassInfo> p_classes_meta_data;
@@ -368,8 +366,9 @@ class ClassWrapper {
     auto &curr_class = p_package.p_classes_meta_data.back();
     // Use name as a flag to distinguish between constructor
     // and normal methods
-    p_package.defun("", detail::create_class<T, true, Args...>, true,
-                    curr_class.name);
+    p_package.defun(std::string(std::to_string(sizeof...(Args)) + "create-" +
+                                std::string(curr_class.name)),
+                    detail::CppConstructor<T, Args...>, false, curr_class.name);
     return *this;
   }
 
