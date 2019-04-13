@@ -3,14 +3,15 @@
 Forked from julia language [libcxxwrap](https://github.com/JuliaInterop/libcxxwrap-julia)
 This is a C++ library to be used with COMMON-LISP such as boost.python, PYBIND11, ...
 
--- **Work is on progress** -- 
 
 # done
 - C++ function, lambda and c functions auto type conversion.
 - Classes
 
 # TODO:
-- support tuples
+- [ ] resolve const type template
+- [ ] convert reference to fundamental types to mapped-types not pointers
+- [ ] support tuples
 
 # compilation
 
