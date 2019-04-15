@@ -9,9 +9,8 @@ This is a C++ library to be used with COMMON-LISP such as boost.python, PYBIND11
 - Classes
 
 # TODO:
-- [ ] resolve const type template
-- [ ] convert reference to fundamental types to mapped-types not pointers
-- [ ] support tuples
+- [x] resolve const type template
+- [ ] support tuples,vectors,...
 
 # compilation
 

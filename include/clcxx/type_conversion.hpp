@@ -244,6 +244,14 @@ struct static_type_mapping<T &> {
   }
 };
 
+// resolve const types
+template <typename T>
+struct static_type_mapping<const T> {
+  using l_type = typename static_type_mapping<T>::type;
+  typedef l_type type;
+  static std::string lisp_type() { return static_type_mapping<T>::lisp_type(); }
+};
+
 template <typename T>
 struct static_type_mapping<T *> {
   typedef void *type;
@@ -315,8 +323,8 @@ inline std::string lisp_type() {
 // ------------------------------------------------------------------//
 // Box an automatically converted value
 /// Wrap a C++ pointer in a lisp type that contains a single void pointer field,
-template <typename CppT, typename LispType = void *>
-inline LispType box(CppT cpp_val) {
+template <typename CppT, typename LispT = void *>
+inline LispT box(CppT cpp_val) {
   return reinterpret_cast<void *>(cpp_val);
 }
 
@@ -378,7 +386,7 @@ inline std::complex<double> unbox(LispComplex v) {
 /////////////////////////////////////
 
 // Base template for converting to CPP
-template <typename CppT, typename Enable = void>
+template <typename CppT, typename Enable = void, typename Constant = void>
 struct ConvertToCpp {
   template <typename lispT>
   CppT *operator()(lispT &&) {
@@ -453,8 +461,18 @@ struct ConvertToCpp<CppT, typename std::enable_if<IsClass<CppT>::value>::type> {
   }
 };
 
+// resolve const types
+template <typename CppT, typename Enable>
+struct ConvertToCpp<CppT, Enable,
+                    typename std::enable_if<std::is_const<CppT>::value>::type> {
+  using LispT = typename static_type_mapping<CppT>::type;
+  CppT operator()(LispT l_value) const {
+    return const_cast<CppT>(ConvertToCpp<std::remove_const<CppT>>()(l_value));
+  }
+};
+
 // Base template for converting To lisp
-template <typename CppT, typename Enable = void>
+template <typename CppT, typename Enable = void, typename Constant = void>
 struct ConvertToLisp {
   template <typename LispT>
   LispT *operator()(CppT &&) {
@@ -519,6 +537,17 @@ struct ConvertToLisp<CppT,
   void *operator()(CppT cpp_class) const {
     auto class_ptr = new CppT(cpp_class);
     return reinterpret_cast<void *>(class_ptr);
+  }
+};
+
+// resolve const types
+template <typename CppT, typename Enable>
+struct ConvertToLisp<
+    CppT, Enable, typename std::enable_if<std::is_const<CppT>::value>::type> {
+  using LispT = typename static_type_mapping<CppT>::type;
+  LispT operator()(CppT cpp_value) const {
+    return ConvertToLisp<std::remove_const<CppT>>()(
+        const_cast<std::remove_const<CppT>>(cpp_value));
   }
 };
 
