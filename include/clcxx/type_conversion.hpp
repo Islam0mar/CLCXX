@@ -425,25 +425,37 @@ struct ConvertToCpp<CppT,
   }
 };
 
-// reference conversion
+namespace detail {
+template <typename CppT, typename LispT>
+struct RefToCpp {
+  // reference to fundamental type
+  CppT operator()(LispT lisp_val) const {
+    static typename std::remove_reference<CppT>::type temp = lisp_val;
+    return temp;
+  }
+};
 template <typename CppT>
-struct ConvertToCpp<
-    CppT, typename std::enable_if<std::is_reference<CppT>::value>::type> {
+struct RefToCpp<CppT, void *> {
   // reference to non-fundamental type
   CppT operator()(void *lisp_val) const {
+    static_assert(
+        std::is_same<typename static_type_mapping<CppT>::type, void *>::value,
+        "type mismatch");
     auto obj_ptr =
         reinterpret_cast<typename std::remove_reference<CppT>::type *>(
             lisp_val);
     return *obj_ptr;
   }
-  // reference to fundamental type
-  template <typename LispT>
+};
+}  // namespace detail
+
+// reference conversion
+template <typename CppT>
+struct ConvertToCpp<
+    CppT, typename std::enable_if<std::is_reference<CppT>::value>::type> {
+  using LispT = typename static_type_mapping<CppT>::type;
   CppT operator()(LispT lisp_val) const {
-    static_assert(
-        std::is_same<LispT, typename static_type_mapping<CppT>::type>::value,
-        "type mismatch");
-    static auto temp = ConvertToCpp<remove_const_ref<CppT>>()(lisp_val);
-    return temp;
+    return detail::RefToCpp<CppT, LispT>()(lisp_val);
   }
 };
 
@@ -515,24 +527,38 @@ struct ConvertToLisp<
   CppT operator()(CppT cpp_val) const { return cpp_val; }
 };
 
-// Reference conversion
+namespace detail {
+
+template <typename CppT, typename LispT>
+struct RefToLisp {
+  // reference to fundamental type
+  LispT operator()(CppT cpp_val) const {
+    return ConvertToLisp<remove_const_ref<CppT>>()(
+        static_cast<remove_const_ref<CppT>>(cpp_val));
+  }
+};
 template <typename CppT>
-struct ConvertToLisp<
-    CppT, typename std::enable_if<std::is_reference<CppT>::value>::type> {
+struct RefToLisp<CppT, void *> {
   // reference to non-fundamental type
   void *operator()(CppT cpp_val) const {
+    static_assert(
+        std::is_same<typename static_type_mapping<CppT>::type, void *>::value,
+        "type mismatch");
     static remove_const_ref<CppT> val = cpp_val;
     lisp_error("Don't forget to copy data; It's temporary pointer!!");
     return reinterpret_cast<void *>(&val);
   }
+};
+}  // namespace detail
+
+// Reference conversion
+template <typename CppT>
+struct ConvertToLisp<
+    CppT, typename std::enable_if<std::is_reference<CppT>::value>::type> {
   // reference to fundamental type
-  template <typename LispT>
+  using LispT = typename static_type_mapping<CppT>::type;
   LispT operator()(CppT cpp_val) const {
-    static_assert(
-        std::is_same<LispT, typename static_type_mapping<CppT>::type>::value,
-        "type mismatch");
-    return ConvertToLisp<remove_const_ref<CppT>>()(
-        static_cast<remove_const_ref<CppT>>(cpp_val));
+    return detail::RefToLisp<CppT, LispT>()(cpp_val);
   }
 };
 

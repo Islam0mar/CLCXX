@@ -380,7 +380,7 @@ class ClassWrapper {
   }
 
   // Add public member >> readwrite
-  template <typename R, typename CT, typename MemberT>
+  template <typename CT, typename MemberT>
   ClassWrapper<T> &member(const std::string &name, MemberT CT::*pm) {
     static_assert(std::is_base_of<CT, T>::value,
                   "member() requires a class member (or base class member)");
