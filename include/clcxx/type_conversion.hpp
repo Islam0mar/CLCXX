@@ -24,6 +24,7 @@ namespace clcxx {
 // for nonPOD struct, class, pointer
 
 std::string class_name(std::type_index i);
+inline void lisp_error(const char *error);
 
 extern "C" typedef union {
   float Float;
@@ -57,7 +58,8 @@ struct IsComplex {
 
 template <typename T>
 struct IsString {
-  static constexpr bool value = std::is_same<T, std::string>::value;
+  static constexpr bool value = std::is_same<T, std::string>::value ||
+                                std::is_same<T, const std::string>::value;
 };
 
 template <typename T>
@@ -68,6 +70,10 @@ struct IsClass {
         std::is_same<T, std::complex<double>>::value) &&
       std::is_class<T>::value;
 };
+
+template <typename T>
+using remove_const_ref =
+    typename std::remove_const<typename std::remove_reference<T>::type>::type;
 
 namespace detail {
 
@@ -235,12 +241,23 @@ struct static_type_mapping<double> {
 //   static std::string lisp_type() { return ":long-double"; }
 // };
 
+// References
 template <typename T>
 struct static_type_mapping<T &> {
-  typedef void *type;
+  // reference to fundamental types => passed and returned as fundamental types
+  //              others => passed and returned as pointers
+  typedef
+      typename std::conditional<IsFundamental<T>::value || IsString<T>::value ||
+                                    IsComplex<T>::value || IsPOD<T>::value,
+                                typename static_type_mapping<T>::type,
+                                void *>::type type;
   static std::string lisp_type() {
-    return std::string("(:reference " + static_type_mapping<T>::lisp_type() +
-                       ")");
+    if (std::is_same<type, void *>::value) {
+      return std::string("(:reference " + static_type_mapping<T>::lisp_type() +
+                         ")");
+    } else {
+      return static_type_mapping<T>::lisp_type();
+    }
   }
 };
 
@@ -412,12 +429,21 @@ struct ConvertToCpp<CppT,
 template <typename CppT>
 struct ConvertToCpp<
     CppT, typename std::enable_if<std::is_reference<CppT>::value>::type> {
-  using LispT = typename static_type_mapping<CppT>::type;
-  CppT operator()(LispT lisp_val) const {
+  // reference to non-fundamental type
+  CppT operator()(void *lisp_val) const {
     auto obj_ptr =
         reinterpret_cast<typename std::remove_reference<CppT>::type *>(
             lisp_val);
     return *obj_ptr;
+  }
+  // reference to fundamental type
+  template <typename LispT>
+  CppT operator()(LispT lisp_val) const {
+    static_assert(
+        std::is_same<LispT, typename static_type_mapping<CppT>::type>::value,
+        "type mismatch");
+    static auto temp = ConvertToCpp<remove_const_ref<CppT>>()(lisp_val);
+    return temp;
   }
 };
 
@@ -493,9 +519,20 @@ struct ConvertToLisp<
 template <typename CppT>
 struct ConvertToLisp<
     CppT, typename std::enable_if<std::is_reference<CppT>::value>::type> {
-  using LispT = typename static_type_mapping<CppT>::type;
+  // reference to non-fundamental type
+  void *operator()(CppT cpp_val) const {
+    static remove_const_ref<CppT> val = cpp_val;
+    lisp_error("Don't forget to copy data; It's temporary pointer!!");
+    return reinterpret_cast<void *>(&val);
+  }
+  // reference to fundamental type
+  template <typename LispT>
   LispT operator()(CppT cpp_val) const {
-    return reinterpret_cast<LispT>(&cpp_val);
+    static_assert(
+        std::is_same<LispT, typename static_type_mapping<CppT>::type>::value,
+        "type mismatch");
+    return ConvertToLisp<remove_const_ref<CppT>>()(
+        static_cast<remove_const_ref<CppT>>(cpp_val));
   }
 };
 
@@ -554,9 +591,11 @@ struct ConvertToLisp<
 template <typename T>
 using lisp_converter_type = ConvertToLisp<T>;
 
-template <typename CppT>
-inline auto convert_to_lisp(const CppT &cpp_val) {
-  return lisp_converter_type<CppT>()(cpp_val);
+/// Conversion to the statically mapped target type.
+template <typename T>
+inline auto convert_to_lisp(T &&cpp_val)
+    -> decltype(lisp_converter_type<T>()(std::forward<T>(cpp_val))) {
+  return lisp_converter_type<T>()(std::forward<T>(cpp_val));
 }
 
 template <typename T>

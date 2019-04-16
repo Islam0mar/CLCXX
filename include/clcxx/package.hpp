@@ -92,8 +92,7 @@ struct ReturnTypeAdapter {
     auto std_func =
         reinterpret_cast<const std::function<R(Args...)> *>(functor);
     assert(std_func != nullptr);
-    return convert_to_lisp(
-        (*std_func)(convert_to_cpp<Args>(args)...));
+    return convert_to_lisp((*std_func)(convert_to_cpp<Args>(args)...));
   }
 };
 
@@ -102,7 +101,6 @@ struct ReturnTypeAdapter<void, Args...> {
   inline void operator()(const void *functor, mapped_lisp_type<Args>... args) {
     auto std_func =
         reinterpret_cast<const std::function<void(Args...)> *>(functor);
-    lisp_error("nice3");
     assert(std_func != nullptr);
     (*std_func)(convert_to_cpp<Args>(args)...);
   }
@@ -347,8 +345,8 @@ class ClassWrapper {
   ClassWrapper<T> &constructor() {
     auto &curr_class = p_package.p_classes_meta_data.back();
     // Use name as a flag
-    p_package.defun(std::string(std::to_string(sizeof...(Args)) + "create-" +
-                                std::string(curr_class.name)),
+    p_package.defun(std::string("create-" + std::string(curr_class.name) +
+                                std::to_string(sizeof...(Args))),
                     detail::CppConstructor<T, Args...>, false, curr_class.name);
     return *this;
   }
