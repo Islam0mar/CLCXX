@@ -11,6 +11,7 @@ Forked from julia language [libcxxwrap](https://github.com/JuliaInterop/libcxxwr
 
 # TODO:
 - [x] resolve const type template
+- [x] reference types
 - [ ] support tuples,vectors,...
 
 # compilation
