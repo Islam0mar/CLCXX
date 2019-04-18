@@ -67,7 +67,7 @@ struct IsClass {
   static constexpr bool value =
       !(std::is_same<T, std::string>::value ||
         std::is_same<T, std::complex<float>>::value ||
-        std::is_same<T, std::complex<double>>::value) &&
+        std::is_same<T, std::complex<double>>::value || IsPOD<T>::value) &&
       std::is_class<T>::value;
 };
 
@@ -545,7 +545,7 @@ struct RefToLisp<CppT, void *> {
         std::is_same<typename static_type_mapping<CppT>::type, void *>::value,
         "type mismatch");
     static remove_const_ref<CppT> val = cpp_val;
-    lisp_error("Don't forget to copy data; It's temporary pointer!!");
+    lisp_error("Don't forget to copy data; It's a temporary pointer!!");
     return reinterpret_cast<void *>(&val);
   }
 };

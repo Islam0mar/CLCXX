@@ -7,7 +7,9 @@ class xx {
  public:
   xx(int xx, int yy) : y(yy), x(xx) {}
   std::string greet() { return "Hello, World"; }
-
+  void operator()(void){
+    std::cout<< "Hello"<<endl;
+  }
   int y;
   int x;
 };
