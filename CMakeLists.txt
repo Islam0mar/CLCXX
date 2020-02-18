@@ -40,6 +40,15 @@ if(WIN32 AND DEFINED ENV{MSYSTEM})
   endif()
 endif()
 
+
+# Liker flags
+# =================
+if(APPLE)
+  set(D_LINER_FLAGS  "-undefined error" "-flat_namespace")
+else()
+  set(D_LINER_FLAGS  "-Wl,--no-undefined" "-Wl,--no-allow-shlib-undefined")
+endif()
+
 set(CMAKE_INSTALL_LIBDIR "lib")
 
 # Source files
@@ -91,7 +100,7 @@ target_include_directories(${CLCXX_TARGET} PUBLIC
 
 target_compile_options(${CLCXX_TARGET} PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:-std=c++14>"  "-Wall")
 
-target_link_libraries(${CLCXX_TARGET}  "-Wl,--no-undefined" "-Wl,--no-allow-shlib-undefined" )
+target_link_libraries(${CLCXX_TARGET}  ${D_LINER_FLAGS})
 set_target_properties(${CLCXX_TARGET} PROPERTIES
   PUBLIC_HEADER "${CLCXX_HEADERS}"
   COMPILE_DEFINITIONS "CLCXX_EXPORTS")
