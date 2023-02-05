@@ -1,7 +1,11 @@
-﻿// #include "clcxx/array.hpp"
+﻿
 #include <cstdint>
+#include <cstring>
+#include <string>
+
 #include "clcxx/clcxx.hpp"
 #include "clcxx/clcxx_config.hpp"
+#include "clcxx/type_conversion.hpp"
 
 extern "C" {
 
@@ -13,17 +17,17 @@ CLCXX_API bool clcxx_init(void (*error_handler)(char *),
     clcxx::registry().set_meta_data_handler(reg_data_callback);
     return true;
   } catch (const std::runtime_error &err) {
-    clcxx::lisp_error(const_cast<char *>(err.what()));
+    clcxx::LispError(const_cast<char *>(err.what()));
   }
   return false;
 }
 
-CLCXX_API bool remove_package(char *pack_name) {
+CLCXX_API bool remove_package(const char *pack_name) {
   try {
     clcxx::registry().remove_package(pack_name);
     return true;
   } catch (const std::runtime_error &err) {
-    clcxx::lisp_error(const_cast<char *>(err.what()));
+    clcxx::LispError(const_cast<char *>(err.what()));
   }
   return false;
 }
@@ -57,7 +61,26 @@ CLCXX_API bool register_package(const char *cl_pack,
     clcxx::registry().reset_current_package();
     return true;
   } catch (const std::runtime_error &err) {
-    clcxx::lisp_error(const_cast<char *>(err.what()));
+    clcxx::LispError(const_cast<char *>(err.what()));
+  }
+  return false;
+}
+
+CLCXX_API size_t used_bytes_size() {
+  return clcxx::MemPool().get_num_of_bytes_allocated();
+}
+
+CLCXX_API size_t max_stack_bytes_size() { return clcxx::BUF_SIZE; }
+
+CLCXX_API bool delete_string(char *str) {
+  try {
+    const auto n = std::strlen(str);
+    clcxx::MemPool().deallocate(static_cast<void *>(str),
+                                (n + 1) * sizeof(char),
+                                std::alignment_of_v<char>);
+    return true;
+  } catch (const std::runtime_error &err) {
+    clcxx::LispError(const_cast<char *>(err.what()));
   }
   return false;
 }
