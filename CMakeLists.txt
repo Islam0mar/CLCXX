@@ -3,7 +3,7 @@ project(ClCxx)
 
 # Build options
 # ============
-option(BUILD_TESTS "Build test programs" ON)
+option(BUILD_TESTS "Build test programs" OFF)
 
 # Dependencies
 # ============
@@ -139,6 +139,12 @@ if(BUILD_TESTS)
   # find_package(Eigen3 REQUIRED)
 
   include(FetchContent)
+
+  set(CATCH_INSTALL_DOCS OFF)
+  set(CATCH_BUILD_TESTING OFF)
+  set(CATCH_INSTALL_EXTRAS OFF)
+  set(CATCH_DEVELOPMENT_BUILD OFF)
+  set(BUILD_TESTING OFF)
 
   FetchContent_Declare(
     Catch2

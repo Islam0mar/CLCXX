@@ -12,7 +12,6 @@
 #include <utility>
 #include <vector>
 
-#include "scope.hpp"
 #include "type_conversion.hpp"
 
 /// helpper for Import function
@@ -66,13 +65,6 @@ inline constexpr bool is_functional_v = is_functional<T>::value;
 
 template <auto invocable_pointer, typename R, typename... Args>
 ToLisp_t<R> DoApply(ToLisp_t<Args>... args) {
-  const auto kTmpDir = std::filesystem::temp_directory_path();
-  const auto kStdOutputFile = kTmpDir.string() + "/clcxx_stdout.txt";
-  // std::freopen(kStdOutputFile.c_str(), "w", stdout);
-
-  // SCOPE_EXIT {
-  //   if (succeeded) std::fclose(stdout);
-  // };
   try {
     if constexpr (std::is_invocable_v<decltype(invocable_pointer),
                                       ToCpp_t<Args>...>) {
@@ -442,12 +434,15 @@ class ClassWrapper {
 
   /// Add a constructor with the given argument types
   template <typename... Args>
-  ClassWrapper<T> &constructor() {
+  ClassWrapper<T> &constructor(std::string name = "") {
     auto &curr_class = p_package.p_classes_meta_data.back();
-    // Use name as a flag
-    p_package.defun(std::string("create-" + std::string(curr_class.name) +
-                                std::to_string(sizeof...(Args))),
-                    F_PTR(detail::CppConstructor<T, Args...>), false,
+
+    if (name == "")
+      // Use name as a flag
+      name = std::string("create-" + std::string(curr_class.name) +
+                         std::to_string(sizeof...(Args)));
+
+    p_package.defun(name, F_PTR(detail::CppConstructor<T, Args...>), false,
                     curr_class.name);
     return *this;
   }
