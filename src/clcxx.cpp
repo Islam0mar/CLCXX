@@ -1,12 +1,26 @@
 ﻿
+#include "clcxx/clcxx.hpp"
+
+#include <cstring>
 #include <stack>
 #include <string>
 
-// #include "clcxx/array.hpp"
-#include "clcxx/clcxx.hpp"
 #include "clcxx/clcxx_config.hpp"
 
 namespace clcxx {
+
+constexpr auto pool_options = std::pmr::pool_options{
+    .max_blocks_per_chunk = 0, .largest_required_pool_block = 512};
+
+VerboseResource &MemPool() {
+  static auto buffer = std::array<std::byte, BUF_SIZE>{};
+  static auto monotonic_resource =
+      std::pmr::monotonic_buffer_resource{buffer.data(), buffer.size()};
+  static auto arena =
+      std::pmr::unsynchronized_pool_resource{pool_options, &monotonic_resource};
+  static auto verbose_arena = VerboseResource(&arena);
+  return verbose_arena;
+}
 
 namespace detail {
 
@@ -23,7 +37,7 @@ char *str_dup(const char *src) {
     }
     return nullptr;
   } catch (std::bad_alloc &err) {
-    lisp_error(err.what());
+    LispError(err.what());
   }
   return nullptr;
 }
@@ -47,7 +61,7 @@ char *str_append(char *old_str, const char *src) {
     }
     return old_str;
   } catch (std::bad_alloc &err) {
-    lisp_error(err.what());
+    LispError(err.what());
   }
   return nullptr;
 }
@@ -79,7 +93,7 @@ void remove_c_strings(ConstantInfo obj) {
 }  // namespace detail
 
 void PackageRegistry::remove_package(std::string lpack) {
-  Package &pack = get_package(lpack);
+  auto &pack = get_package(lpack);
   for (const auto &Class : pack.classes_meta_data()) {
     detail::remove_c_strings(Class);
   }
@@ -89,15 +103,6 @@ void PackageRegistry::remove_package(std::string lpack) {
   for (const auto &Func : pack.functions_meta_data()) {
     detail::remove_c_strings(Func);
   }
-  p_packages.erase(lpack);
-}
-
-std::string class_name(std::type_index i) {
-  return registry().current_package().classes()[i];
-}
-
-auto PackageRegistry::functions() {
-  return PackageRegistry::current_package().functions();
 }
 
 Package &PackageRegistry::create_package(std::string pack_name) {
