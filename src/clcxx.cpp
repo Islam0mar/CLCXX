@@ -93,7 +93,8 @@ void remove_c_strings(ConstantInfo obj) {
 }  // namespace detail
 
 void PackageRegistry::remove_package(std::string lpack) {
-  auto &pack = get_package(lpack);
+  const auto iter = get_package_iter(lpack);
+  auto &pack = *iter->second;
   for (const auto &Class : pack.classes_meta_data()) {
     detail::remove_c_strings(Class);
   }
@@ -103,6 +104,22 @@ void PackageRegistry::remove_package(std::string lpack) {
   for (const auto &Func : pack.functions_meta_data()) {
     detail::remove_c_strings(Func);
   }
+  p_packages.erase(iter);
+}
+
+PackageRegistry::Iter PackageRegistry::remove_package(
+    PackageRegistry::Iter iter) {
+  auto &pack = *iter->second;
+  for (const auto &Class : pack.classes_meta_data()) {
+    detail::remove_c_strings(Class);
+  }
+  for (const auto &Constant : pack.constants_meta_data()) {
+    detail::remove_c_strings(Constant);
+  }
+  for (const auto &Func : pack.functions_meta_data()) {
+    detail::remove_c_strings(Func);
+  }
+  return p_packages.erase(iter);
 }
 
 Package &PackageRegistry::create_package(std::string pack_name) {

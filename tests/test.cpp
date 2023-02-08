@@ -68,7 +68,7 @@ TEST_CASE("clcxx test", "[clcxx]") {
   // std::cout << clcxx::TypeName<clcxx::ToLisp_t<const A &> &&>() << std::endl;
   // std::cout << clcxx::TypeName<decltype(k)>() << std::endl;
   // std::cout << clcxx::TypeName<decltype(d)>() << std::endl;
-  clcxx::Package &pack = clcxx::registry().create_package("asd");
+  clcxx::Package &pack = clcxx::registry().create_package("test");
   Test(pack);
 
   REQUIRE(clcxx::registry().has_current_package());
@@ -179,4 +179,6 @@ TEST_CASE("clcxx test", "[clcxx]") {
     REQUIRE(res.x == a.x);
     REQUIRE(res.y == a.y);
   }
+  REQUIRE_NOTHROW(clcxx::registry().remove_package("test"));
+  REQUIRE_THROWS(clcxx::registry().remove_package("test"));
 }
