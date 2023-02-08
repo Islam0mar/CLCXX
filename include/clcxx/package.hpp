@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdio>
-#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory_resource>
@@ -249,14 +248,13 @@ class CLCXX_API PackageRegistry {
   /// Create a package and register it
   Package &create_package(std::string lpack);
 
-  Package &get_package(std::string pack) const {
+  auto get_package_iter(std::string pack) const {
     const auto iter = p_packages.find(pack);
     if (iter == p_packages.end()) {
       throw std::runtime_error("Pack with name " + pack +
                                " was not found in registry");
     }
-
-    return *(iter->second);
+    return iter;
   }
 
   bool has_package(std::string lpack) const {
@@ -265,14 +263,16 @@ class CLCXX_API PackageRegistry {
 
   void remove_package(std::string lpack);
 
+  using Iter = std::map<std::string, std::unique_ptr<Package>>::iterator;
+  [[nodiscard]] Iter remove_package(Iter iter);
+
   bool has_current_package() { return p_current_package != nullptr; }
   Package &current_package();
   void reset_current_package() { p_current_package = nullptr; }
 
   ~PackageRegistry() {
     for (auto it = begin(p_packages); it != end(p_packages);) {
-      remove_package(it->first);
-      it = p_packages.erase(it);
+      it = remove_package(it);
     }
   }
 
