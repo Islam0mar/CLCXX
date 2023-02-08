@@ -103,6 +103,8 @@ void PackageRegistry::remove_package(std::string lpack) {
   for (const auto &Func : pack.functions_meta_data()) {
     detail::remove_c_strings(Func);
   }
+  const auto iter = p_packages.find(lpack);
+  p_packages.erase(iter);
 }
 
 Package &PackageRegistry::create_package(std::string pack_name) {
