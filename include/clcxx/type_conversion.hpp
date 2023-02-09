@@ -278,12 +278,12 @@ struct static_type_mapping<bool> {
 template <>
 struct static_type_mapping<const char *> {
   typedef const char *type;
-  static std::string lisp_type() { return ":string"; }
+  static std::string lisp_type() { return ":string+ptr"; }
 };
 template <>
 struct static_type_mapping<std::string> {
   typedef const char *type;
-  static std::string lisp_type() { return ":string"; }
+  static std::string lisp_type() { return ":string+ptr"; }
 };
 template <>
 struct static_type_mapping<void> {
