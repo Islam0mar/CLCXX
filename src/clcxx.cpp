@@ -17,7 +17,7 @@ VerboseResource &MemPool() {
   static auto monotonic_resource =
       std::pmr::monotonic_buffer_resource{buffer.data(), buffer.size()};
   static auto arena =
-      std::pmr::unsynchronized_pool_resource{pool_options, &monotonic_resource};
+      std::pmr::synchronized_pool_resource{pool_options, &monotonic_resource};
   static auto verbose_arena = VerboseResource(&arena);
   return verbose_arena;
 }
