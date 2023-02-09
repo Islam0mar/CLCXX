@@ -37,6 +37,20 @@ else()
   set(D_LINER_FLAGS "-Wl,--no-undefined" "-Wl,--no-allow-shlib-undefined")
 endif()
 
+# Compiler flags
+# =================
+
+# -march=native for GCC, Clang and ICC in any version that does support it.
+
+if((NOT CRYPTOPP_CROSS_COMPILE) AND (CMAKE_CXX_COMPILER_ID MATCHES
+                                     "Clang|GNU|Intel"))
+  check_cxx_compiler_flag("-march=native" COMPILER_OPT_ARCH_NATIVE_SUPPORTED)
+  if(COMPILER_OPT_ARCH_NATIVE_SUPPORTED AND NOT CMAKE_CXX_FLAGS MATCHES
+                                            "-march=")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+  endif()
+endif()
+
 set(CMAKE_INSTALL_LIBDIR "lib")
 
 # Source files
@@ -84,7 +98,7 @@ target_compile_options(
   PRIVATE
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
     -Wall
-    -ggdb3
+    -O3
     -Wextra>
     $<$<CXX_COMPILER_ID:MSVC>:
     /W4>)
