@@ -213,6 +213,8 @@ struct CreateClass<T, false, Args...> {
 
 template <typename T>
 void free_obj_ptr(void *ptr) {
+  auto obj_ptr = static_cast<T *>(ptr);
+  obj_ptr->~T();
   MemPool().deallocate(ptr, sizeof(T), std::alignment_of_v<T>);
 }
 
