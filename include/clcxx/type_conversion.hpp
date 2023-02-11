@@ -33,7 +33,9 @@ extern "C" typedef struct {
 } LispComplex;
 
 template <typename T>
-inline std::string class_name();
+inline std::string general_class_name();
+template <typename T>
+inline std::string pod_class_name();
 
 namespace internal {
 template <typename T>
@@ -98,10 +100,11 @@ struct static_type_mapping {
   typedef typename std::conditional_t<is_pod_struct_v<T>, T, void *> type;
   static std::string lisp_type() {
     static_assert(std::is_class_v<T>, "Unkown type");
-    if constexpr (is_pod_struct_v<T>)
-      return std::string("(:struct " + class_name<T>() + ")");
+    using ClassT = std::remove_cv_t<T>;
+    if constexpr (is_pod_struct_v<ClassT>)
+      return std::string("(:struct " + pod_class_name<ClassT>() + ")");
     else
-      return std::string("(:class " + class_name<T>() + ")");
+      return std::string("(:class " + general_class_name<ClassT>() + ")");
   }
 };
 

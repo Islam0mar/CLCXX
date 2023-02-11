@@ -25,8 +25,8 @@ extern "C" typedef struct {
   char *super_classes;
   char *slot_names;
   char *slot_types;
-  void (*constructor)();
-  void (*destructor)();
+  void (*constructor)();  // null := pod class
+  void (*destructor)();   // null := pod class
 } ClassInfo;
 
 extern "C" typedef struct {
@@ -71,7 +71,7 @@ ToLisp_t<R> DoApply(ToLisp_t<Args>... args) {
         std::invoke(invocable_pointer, ToCpp<Args>(std::move(args))...);
         return;
       } else {
-        return ToLisp(
+        return ToLisp<R>(
             std::invoke(invocable_pointer, ToCpp<Args>(std::move(args))...));
       }
     } else {
@@ -79,7 +79,7 @@ ToLisp_t<R> DoApply(ToLisp_t<Args>... args) {
         std::invoke(*invocable_pointer, ToCpp<Args>(std::move(args))...);
         return;
       } else {
-        return ToLisp(
+        return ToLisp<R>(
             std::invoke(*invocable_pointer, ToCpp<Args>(std::move(args))...));
       }
     }
@@ -218,10 +218,24 @@ void free_obj_ptr(void *ptr) {
   MemPool().deallocate(ptr, sizeof(T), std::alignment_of_v<T>);
 }
 
+/// handle POD class
+template <typename CppT>
+std::string arg_type_pod_fix() {
+  using T = std::remove_cv_t<CppT>;
+  auto return_type = LispType<CppT>();  // case 1
+  if constexpr (internal::is_pod_struct_v<T>) {
+    if (::clcxx::pod_class_name<T>() == "") {
+      throw std::runtime_error("Pod class " + std::string(TypeName<T>()) +
+                               " isn't registered and it is passed by value");
+    }
+  }
+  return return_type;
+}
+
 /// Make a string with the types in the variadic template parameter pack
 template <typename... Args>
 std::string arg_types_string() {
-  std::vector<std::string> vec = {LispType<Args>()...};
+  std::vector<std::string> vec = {arg_type_pod_fix<Args>()...};
   std::string s;
   for (auto arg_types : vec) {
     s.append(arg_types);
@@ -234,7 +248,7 @@ std::string arg_types_string() {
 /// pack
 template <typename... Args>
 std::string super_classes_string() {
-  std::vector<std::string> vec = {class_name<Args>()...};
+  std::vector<std::string> vec = {general_class_name<Args>()...};
   std::string s;
   for (auto super_types : vec) {
     s.append(super_types);
@@ -309,6 +323,8 @@ inline void LispError(const char *error) {
 
 template <typename T>
 class ClassWrapper;
+template <typename T>
+class PodClassWrapper;
 
 /// Store all exposed C++ functions associated with a package
 class CLCXX_API Package {
@@ -325,13 +341,15 @@ class CLCXX_API Package {
   /// Add a class type
   template <typename T, bool Constructor = true, typename... s_classes>
   ClassWrapper<T> defclass(const std::string &name, s_classes...) {
-    auto iter = class_name.find(Hash32TypeName<T>());
-    if (iter != class_name.end()) {
+    static_assert(!internal::is_pod_struct_v<T>,
+                  "Use defcstruct for pod class types.");
+    auto iter = general_class_name.find(Hash32TypeName<T>());
+    if (iter != general_class_name.end()) {
       throw std::runtime_error("Class with name " + name +
                                " was already defined in the package, or maybe "
                                "murmur3 string collision!");
     }
-    class_name[Hash32TypeName<T>()] = name;
+    general_class_name[Hash32TypeName<T>()] = name;
 
     ClassInfo c_info;
     c_info.constructor = detail::CreateClass<T, Constructor>()();
@@ -346,6 +364,32 @@ class CLCXX_API Package {
     return ClassWrapper<T>(*this);
   }
 
+  template <typename T>
+  PodClassWrapper<T> defcstruct(const std::string &name) {
+    static_assert(internal::is_pod_struct_v<T>,
+                  "defcstruct can be used for pod class types only, you should "
+                  "defclass.");
+    auto iter = pod_class_name.find(Hash32TypeName<T>());
+    if (iter != pod_class_name.end()) {
+      throw std::runtime_error("struct with name " + name +
+                               " was already defined in the package, or maybe "
+                               "murmur3 string collision!" +
+                               iter->second);
+    }
+    pod_class_name[Hash32TypeName<T>()] = name;
+
+    ClassInfo c_info;
+    c_info.constructor = nullptr;
+    c_info.destructor = nullptr;
+    c_info.slot_types = nullptr;
+    c_info.slot_names = nullptr;
+    c_info.name = detail::str_dup(name.c_str());
+    c_info.super_classes = nullptr;
+    // Store data
+    p_classes_meta_data.push_back(c_info);
+    return PodClassWrapper<T>(*this);
+  }
+
   /// Set a global constant value at the package level
   template <typename T>
   void defconstant(const std::string &name, T &&value) {
@@ -357,7 +401,14 @@ class CLCXX_API Package {
 
   std::string name() const { return p_cl_pack; }
 
-  std::unordered_map<SizeT, std::string> classes() { return class_name; }
+  const std::unordered_map<SizeT, std::string> &general_classes() const {
+    return general_class_name;
+  }
+
+  const std::unordered_map<SizeT, std::string> &pod_classes() const {
+    return pod_class_name;
+  }
+
   std::vector<ClassInfo> &classes_meta_data() { return p_classes_meta_data; }
   std::vector<FunctionInfo> &functions_meta_data() {
     return p_functions_meta_data;
@@ -376,7 +427,7 @@ class CLCXX_API Package {
     f_info.func_ptr = func_ptr;
     f_info.arg_types =
         detail::str_dup(detail::arg_types_string<Args...>().c_str());
-    f_info.return_type = detail::str_dup(LispType<R>().c_str());
+    f_info.return_type = detail::str_dup(detail::arg_type_pod_fix<R>().c_str());
     // store data
     p_functions_meta_data.push_back(f_info);
   }
@@ -421,12 +472,49 @@ class CLCXX_API Package {
   std::vector<ClassInfo> p_classes_meta_data;
   std::vector<FunctionInfo> p_functions_meta_data;
   std::vector<ConstantInfo> p_constants;
-  std::unordered_map<SizeT, std::string> class_name;
+  std::unordered_map<SizeT, std::string> general_class_name;
+  std::unordered_map<SizeT, std::string> pod_class_name;
+  template <class T>
+  friend class PodClassWrapper;
   template <class T>
   friend class ClassWrapper;
 };
 
 // Helper class to wrap type methods
+template <typename T>
+class PodClassWrapper {
+ public:
+  typedef T type;
+
+  explicit PodClassWrapper(Package &pack) : p_package(pack) {}
+
+  // Add public member >> readwrite
+  template <typename CT, typename MemberT>
+  PodClassWrapper<T> &member(const std::string &name, MemberT CT::*pm) {
+    check_member_and_append_its_slots(name, pm);
+    return *this;
+  }
+
+  // Access to the module
+  Package &package() { return p_package; }
+
+ private:
+  template <typename CT, typename MemberT>
+  constexpr void check_member_and_append_its_slots(const std::string &name,
+                                                   MemberT CT::*) {
+    static_assert(std::is_base_of<CT, T>::value,
+                  "member() requires a class member (or base class member)");
+    auto &curr_class = p_package.p_classes_meta_data.back();
+
+    curr_class.slot_types = detail::str_append(
+        curr_class.slot_types, std::string(LispType<MemberT>() + "+").c_str());
+    curr_class.slot_names = detail::str_append(curr_class.slot_names,
+                                               std::string(name + "+").c_str());
+  }
+
+  Package &p_package;
+};
+
 template <typename T>
 class ClassWrapper {
  public:
@@ -521,8 +609,17 @@ class ClassWrapper {
 };
 
 template <typename T>
-inline std::string class_name() {
-  return registry().current_package().classes()[Hash32TypeName<T>()];
+inline std::string general_class_name() {
+  auto classes = registry().current_package().general_classes();
+  auto iter = classes.find(Hash32TypeName<T>());
+  return iter == classes.end() ? "" : iter->second;
+}
+
+template <typename T>
+inline std::string pod_class_name() {
+  auto classes = registry().current_package().pod_classes();
+  auto iter = classes.find(Hash32TypeName<T>());
+  return iter == classes.end() ? "" : iter->second;
 }
 
 }  // namespace clcxx

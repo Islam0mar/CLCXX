@@ -8,6 +8,25 @@
 
 #define CONFIG_CATCH_MAIN
 
+class Pod {
+ public:
+  int x;
+  float y;
+  long int one() const { return 1; }
+};
+
+const Pod &ReturnPodRef() {
+  static auto x = Pod{1, 3.5};
+  return x;
+}
+
+const Pod ReturnPod() { return Pod{1, 3.5}; }
+Pod ManipulatePod(Pod a) {
+  a.x += 10;
+  a.y += 10;
+  return a;
+}
+
 class A {
  public:
   A(int A, int yy) : y(yy), x(A) {}
@@ -40,24 +59,32 @@ CLCXX_PACKAGE Test(clcxx::Package &pack) {
   pack.defun("test-complex1", F_PTR(&ComplexReal));
   pack.defun("test-complex2", F_PTR(&ComplexImag));
   pack.defun("ref-int", F_PTR(&RefInt));
-  pack.defun("ref-class", F_PTR(&RefClass));
-  pack.defun("lambda1", F_PTR([](A x) { return x.x; }));  // 8
-  pack.defun("lambda2", F_PTR([](A x) { return x.x; }));  // 9
   pack.defclass<A, false>("A")
-      .defmethod("class-greet", F_PTR(&A::Greet))
-      .defmethod("class-operator", F_PTR(&A::operator()))
+      .defmethod("class-greet", F_PTR(&A::Greet))          // 7
+      .defmethod("class-operator", F_PTR(&A::operator()))  // 8
       .defmethod("class-lambda", F_PTR([](A x) { return x.x; }))
       .constructor<int, int>()
       .member("y", &A::y)
       .defmethod("add", F_PTR(&A::add<int>))
       .defmethod("one", F_PTR(&A::one));
-  pack.defun("create-class", F_PTR([]() { return A(1, 4); }));
+  pack.defun("ref-class", F_PTR(&RefClass));                    // 15
+  pack.defun("lambda1", F_PTR([](A x) { return x.x; }));        // 16
+  pack.defun("create-class", F_PTR([]() { return A(1, 4); }));  // 17
+  pack.defun("dummy", F_PTR(&ReturnPodRef));                    // 18
+  pack.defcstruct<Pod>("Pod").member("x", &Pod::x).member("y", &Pod::y);
+
+  pack.defun("create-pod", F_PTR(&ReturnPod));      // 19
+  pack.defun("create-pod", F_PTR(&ManipulatePod));  // 20
+}
+
+CLCXX_PACKAGE Test2(clcxx::Package &pack) {
+  pack.defun("create-pod", F_PTR(&ReturnPod));
 }
 
 TEST_CASE("clcxx test", "[clcxx]") {
   // // auto d = clcxx::Import([]() { return &A::one; });
   // constexpr auto f = &A::one;
-  // // auto k = std::addressof(DoApply<long int, const A>);  //, float, const
+  // // auto k = std::addressof(DoApply<long int, const A>);  //, float,  const
   // // int>;
   // using S = const A;
   // // auto k = &DoApply<long int, S>;  //, float, const int>;
@@ -128,27 +155,10 @@ TEST_CASE("clcxx test", "[clcxx]") {
     REQUIRE(res == 50);
   }
   {
-    A a(1, 2);
-    auto f = clcxx::Import([&]() { return &RefClass; });
-    std::invoke(reinterpret_cast<decltype(f)>(
-                    pack.functions_meta_data().at(7).func_ptr),
-                (void *)&a);
-    REQUIRE(a.x == 1);
-    REQUIRE(a.y == 1000000);
-  }
-  {
-    A a(7, 2);
-    auto f = clcxx::Import([]() { return [](A x) { return x.x; }; });
-    auto res = std::invoke(reinterpret_cast<decltype(f)>(
-                               pack.functions_meta_data().at(8).func_ptr),
-                           (void *)&a);
-    REQUIRE(res == 7);
-  }
-  {
     A a(7, 2);
     auto f = clcxx::Import([]() { return &A::Greet; });
     auto res = std::invoke(reinterpret_cast<decltype(f)>(
-                               pack.functions_meta_data().at(10).func_ptr),
+                               pack.functions_meta_data().at(7).func_ptr),
                            (void *)&a);
     REQUIRE(strcmp(res, "Hello, World") == 0);
   }
@@ -156,7 +166,7 @@ TEST_CASE("clcxx test", "[clcxx]") {
     A a(7, 2);
     auto f = clcxx::Import([]() { return &A::operator(); });
     auto res = std::invoke(reinterpret_cast<decltype(f)>(
-                               pack.functions_meta_data().at(11).func_ptr),
+                               pack.functions_meta_data().at(8).func_ptr),
                            (void *)&a);
     REQUIRE(res == 0.0f);
   }
@@ -164,7 +174,7 @@ TEST_CASE("clcxx test", "[clcxx]") {
     A a(7, 2);
     auto f = clcxx::Import([]() { return [](A x) { return x.x; }; });
     auto res = std::invoke(reinterpret_cast<decltype(f)>(
-                               pack.functions_meta_data().at(12).func_ptr),
+                               pack.functions_meta_data().at(9).func_ptr),
                            (void *)&a);
     REQUIRE(res == 7);
   }
@@ -174,11 +184,48 @@ TEST_CASE("clcxx test", "[clcxx]") {
         []() { return &clcxx::detail::CppConstructor<A, int, int>; });
     auto res = clcxx::ToCpp<A>(
         std::invoke(reinterpret_cast<decltype(f)>(
-                        pack.functions_meta_data().at(13).func_ptr),
+                        pack.functions_meta_data().at(10).func_ptr),
                     a.x, a.y));
     REQUIRE(res.x == a.x);
     REQUIRE(res.y == a.y);
   }
+  {
+    A a(1, 2);
+    auto f = clcxx::Import([&]() { return &RefClass; });
+    std::invoke(reinterpret_cast<decltype(f)>(
+                    pack.functions_meta_data().at(15).func_ptr),
+                (void *)&a);
+    REQUIRE(a.x == 1);
+    REQUIRE(a.y == 1000000);
+  }
+  {
+    A a(7, 2);
+    auto f = clcxx::Import([]() { return [](A x) { return x.x; }; });
+    auto res = std::invoke(reinterpret_cast<decltype(f)>(
+                               pack.functions_meta_data().at(16).func_ptr),
+                           (void *)&a);
+    REQUIRE(res == 7);
+  }
+  {
+    Pod a{1, 3.5};
+    auto f = clcxx::Import([]() { return &ReturnPod; });
+    auto res = std::invoke(reinterpret_cast<decltype(f)>(
+        pack.functions_meta_data().at(19).func_ptr));
+    REQUIRE(res.x == a.x);
+    REQUIRE(res.y == a.y);
+  }
+  {
+    Pod a{1, 3.5};
+    auto f = clcxx::Import([]() { return &ManipulatePod; });
+    auto res = std::invoke(reinterpret_cast<decltype(f)>(
+                               pack.functions_meta_data().at(20).func_ptr),
+                           a);
+    REQUIRE(res.x == a.x + 10);
+    REQUIRE(res.y == a.y + 10);
+  }
+
   REQUIRE_NOTHROW(clcxx::registry().remove_package("test"));
   REQUIRE_THROWS(clcxx::registry().remove_package("test"));
+
+  REQUIRE_THROWS(Test2(pack));
 }
