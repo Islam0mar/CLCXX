@@ -27,6 +27,13 @@ Pod ManipulatePod(Pod a) {
   return a;
 }
 
+double FuncPtrDummy(double x) { return x + 10; }
+double FuncStd(
+    const std::function<double(double)> &f) {  // FIXME: don't try this
+  return f(1.5);
+}
+double FuncPtr(double (*f)(double)) { return f(1.5); }
+
 class A {
  public:
   A(int A, int yy) : y(yy), x(A) {}
@@ -75,6 +82,7 @@ CLCXX_PACKAGE Test(clcxx::Package &pack) {
 
   pack.defun("create-pod", F_PTR(&ReturnPod));      // 19
   pack.defun("create-pod", F_PTR(&ManipulatePod));  // 20
+  pack.defun("func-ptr", F_PTR(&FuncPtr));          // 21
 }
 
 CLCXX_PACKAGE Test2(clcxx::Package &pack) {
@@ -222,6 +230,13 @@ TEST_CASE("clcxx test", "[clcxx]") {
                            a);
     REQUIRE(res.x == a.x + 10);
     REQUIRE(res.y == a.y + 10);
+  }
+  {
+    auto f = clcxx::Import([]() { return &FuncPtr; });
+    auto res = std::invoke(reinterpret_cast<decltype(f)>(
+                               pack.functions_meta_data().at(21).func_ptr),
+                           (void (*)())FuncPtrDummy);
+    REQUIRE(res == FuncPtr(FuncPtrDummy));
   }
 
   REQUIRE_NOTHROW(clcxx::registry().remove_package("test"));

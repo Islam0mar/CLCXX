@@ -247,6 +247,12 @@ struct static_type_mapping<const T> {
   static std::string lisp_type() { return static_type_mapping<T>::lisp_type(); }
 };
 
+template <typename R, typename... Args>
+struct static_type_mapping<R (*)(Args...)> {
+  typedef void (*type)();
+  static std::string lisp_type() { return std::string(":pointer"); }
+};
+
 template <typename T>
 struct static_type_mapping<T *> {
   typedef void *type;
@@ -314,72 +320,99 @@ struct static_type_mapping<std::complex<double>> {
 
 // ------------------------------------------------------------------//
 // Box an automatically converted value
+
+/// Convenience function to get the lisp data type associated with T
+template <typename CppT, typename LispT>
+struct Box {
+  inline LispT operator()(CppT) {
+    static_assert(sizeof(CppT) == 0, "Box unkown type");
+  }
+};
+
 /// Wrap a C++ pointer in void pointer lisp cffi
 template <typename CppT, typename LispT>
-inline LispT box(CppT cpp_val) {
-  static_assert(std::is_pointer_v<CppT>, "Box unkown type");
-  return static_cast<LispT>(cpp_val);
-}
+struct Box<CppT *, LispT> {
+  inline LispT operator()(CppT *cpp_val) { return static_cast<LispT>(cpp_val); }
+};
+
+/// function pointer
+template <typename R, typename LispT, typename... Args>
+struct Box<R (*)(Args...), LispT> {
+  inline LispT operator()(R (*cpp_val)(Args...)) {
+    return reinterpret_cast<LispT>(cpp_val);
+  }
+};
 
 template <>
-inline const char *box(const char *str) {
-  const auto n = std::strlen(str);
-  auto new_str = static_cast<char *>(
-      MemPool().allocate((n + 1) * sizeof(char), std::alignment_of_v<char>));
-  std::strcpy(new_str, str);
-  new_str[n] = '\0';
-  return new_str;
-}
+struct Box<const char *, const char *> {
+  inline const char *operator()(const char *str) {
+    const auto n = std::strlen(str);
+    auto new_str = static_cast<char *>(
+        MemPool().allocate((n + 1) * sizeof(char), std::alignment_of_v<char>));
+    std::strcpy(new_str, str);
+    new_str[n] = '\0';
+    return new_str;
+  }
+};
 
-template <>
-inline LispComplex box(std::complex<float> x) {
-  LispComplex c;
-  c.real.Float = std::real(x);
-  c.imag.Float = std::imag(x);
-  return c;
-}
-
-template <>
-inline LispComplex box(std::complex<double> x) {
-  LispComplex c;
-  c.real.Double = std::real(x);
-  c.imag.Double = std::imag(x);
-  return c;
-}
-
-// template <> inline LispComplex box(std::complex<long double> x) {
-//   LispComplex c;
-//   c.real.LongDouble = std::real(x);
-//   c.imag.LongDouble = std::imag(x);
-//   return c;
-// }
-
+template <typename T>
+struct Box<std::complex<T>, LispComplex> {
+  inline LispComplex operator()(std::complex<T> x) {
+    LispComplex c;
+    if constexpr (std::is_same_v<float, std::remove_cv_t<T>>) {
+      c.real.Float = std::real(x);
+      c.imag.Float = std::imag(x);
+    } else {
+      c.real.Double = std::real(x);
+      c.imag.Double = std::imag(x);
+    }
+    return c;
+  }
+};
 // unbox -----------------------------------------------------------------//
-/// pointers
+/// Convenience function to get the lisp data type associated with T
 template <typename CppT, typename LispT>
-CppT unbox(LispT lisp_val) {
-  static_assert(std::is_pointer_v<CppT>, "Box unkown type");
-  return static_cast<CppT>(lisp_val);
-}
+struct UnBox {
+  inline CppT operator()(LispT) {
+    static_assert(sizeof(LispT) == 0, "Box unkown type");
+  }
+};
+
+/// Wrap a C++ pointer in void pointer lisp cffi
+template <typename CppT, typename LispT>
+struct UnBox<CppT *, LispT> {
+  inline CppT *operator()(LispT lisp_val) {
+    return static_cast<CppT *>(lisp_val);
+  }
+};
+
+/// function pointer
+template <typename R, typename LispT, typename... Args>
+struct UnBox<R (*)(Args...), LispT> {
+  using CppT = R (*)(Args...);
+  inline CppT operator()(LispT lisp_val) {
+    return reinterpret_cast<CppT>(lisp_val);
+  }
+};
 
 template <>
-inline const char *unbox(const char *v) {
-  return v;
-}
+struct UnBox<const char *, const char *> {
+  inline const char *operator()(const char *str) { return str; }
+};
 
 template <>
-inline std::complex<float> unbox(LispComplex v) {
-  return std::complex<float>(v.real.Float, v.imag.Float);
-}
+struct UnBox<std::complex<float>, LispComplex> {
+  inline std::complex<float> operator()(LispComplex v) {
+    return std::complex<float>(v.real.Float, v.imag.Float);
+  }
+};
 
 template <>
-inline std::complex<double> unbox(LispComplex v) {
-  return std::complex<double>(v.real.Double, v.imag.Double);
-}
-
-// template <> inline std::complex<long double> unbox(LispComplex v) {
-//   return std::complex<long double>(v.real.LongDouble, v.imag.LongDouble);
-// }
+struct UnBox<std::complex<double>, LispComplex> {
+  inline std::complex<double> operator()(LispComplex v) {
+    return std::complex<double>(v.real.Double, v.imag.Double);
+  }
+};
 
 /////////////////////////////////////
 
@@ -436,14 +469,18 @@ struct ConvertToCpp<CppT,
 template <typename CppT>
 struct ConvertToCpp<CppT, typename std::enable_if_t<std::is_pointer_v<CppT>>> {
   using LispT = typename static_type_mapping<CppT>::type;
-  CppT operator()(LispT lisp_val) const { return unbox<CppT, LispT>(lisp_val); }
+  CppT operator()(LispT lisp_val) const {
+    return UnBox<CppT, LispT>()(lisp_val);
+  }
 };
 
 // complex numbers types
 template <typename CppT>
 struct ConvertToCpp<CppT, typename std::enable_if_t<is_complex_v<CppT>>> {
   using LispT = typename static_type_mapping<CppT>::type;
-  CppT operator()(LispT lisp_val) const { return unbox<CppT, LispT>(lisp_val); }
+  CppT operator()(LispT lisp_val) const {
+    return UnBox<CppT, LispT>()(lisp_val);
+  }
 };
 
 // strings
@@ -536,7 +573,7 @@ struct ConvertToLisp<CppT, typename std::enable_if_t<std::is_pointer_v<CppT>>> {
   using LispT = typename static_type_mapping<CppT>::type;
   LispT operator()(CppT cpp_val) const {
     static_assert(std::is_pointer_v<LispT>, "type mismatch");
-    return box<CppT, LispT>(cpp_val);
+    return Box<CppT, LispT>()(cpp_val);
   }
 };
 
@@ -547,7 +584,7 @@ struct ConvertToLisp<CppT, typename std::enable_if_t<is_complex_v<CppT>>> {
   using LispT = typename static_type_mapping<CppT>::type;
   LispT operator()(CppT cpp_val) const {
     static_assert(std::is_same_v<LispT, LispComplex>, "type mismatch");
-    return box<CppT, LispT>(cpp_val);
+    return Box<CppT, LispT>()(cpp_val);
   }
 };
 
