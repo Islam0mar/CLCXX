@@ -182,8 +182,13 @@ inline auto Import(T lambda) {
 
 namespace detail {
 
-char *str_dup(const char *src);
-char *str_append(char *old_str, const char *src);
+#ifdef _WIN64
+   CLCXX_API char *str_dup(const char *src);
+   CLCXX_API char *str_append(char *old_str, const char *src);
+#else
+   char *str_dup(const char *src);
+   char *str_append(char *old_str, const char *src);
+#endif
 
 template <typename T>
 void remove_c_strings(T obj);
@@ -264,13 +269,21 @@ class CLCXX_API PackageRegistry {
   /// Create a package and register it
   Package &create_package(std::string lpack);
 
+#ifdef _MSC_VER
+  Package &get_package(std::string pack) const {
+#else
   auto get_package_iter(std::string pack) const {
+#endif
     const auto iter = p_packages.find(pack);
     if (iter == p_packages.end()) {
       throw std::runtime_error("Pack with name " + pack +
                                " was not found in registry");
     }
+#ifdef _MSC_VER
+    return *(iter->second);
+#else
     return iter;
+#endif
   }
 
   bool has_package(std::string lpack) const {
@@ -279,16 +292,22 @@ class CLCXX_API PackageRegistry {
 
   void remove_package(std::string lpack);
 
+#ifndef _MSC_VER
   using Iter = std::map<std::string, std::unique_ptr<Package>>::iterator;
   [[nodiscard]] Iter remove_package(Iter iter);
-
+#endif
   bool has_current_package() { return p_current_package != nullptr; }
   Package &current_package();
   void reset_current_package() { p_current_package = nullptr; }
 
   ~PackageRegistry() {
     for (auto it = begin(p_packages); it != end(p_packages);) {
+#ifdef _MSC_VER
+      remove_package(it->first);
+      it = p_packages.erase(it);
+#else
       it = remove_package(it);
+#endif  
     }
   }
 
@@ -309,7 +328,11 @@ class CLCXX_API PackageRegistry {
   void send_data(MetaData *M, uint8_t n) { p_meta_data_handler_callback(M, n); }
 
  private:
+#ifdef _MSC_VER
+  std::map<std::string, std::shared_ptr<Package>> p_packages; 
+#else
   std::map<std::string, std::unique_ptr<Package>> p_packages;
+#endif
   Package *p_current_package = nullptr;
   void (*p_error_handler_callback)(char *);
   void (*p_meta_data_handler_callback)(MetaData *, uint8_t);

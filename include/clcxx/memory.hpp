@@ -34,6 +34,10 @@ class VerboseResource : public std::pmr::memory_resource {
   size_t num_of_bytes_allocated;
 };
 
-[[nodiscard]] VerboseResource &MemPool();
+#ifdef _WIN64
+   CLCXX_API [[nodiscard]] VerboseResource &MemPool();
+#else
+   [[nodiscard]] VerboseResource &MemPool();
+#endif
 
 }  // namespace clcxx

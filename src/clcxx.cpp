@@ -5,6 +5,11 @@
 #include <stack>
 #include <string>
 
+#ifdef _MSC_VER
+   #include <cstddef>
+   #include <array>
+#endif
+
 #include "clcxx/clcxx_config.hpp"
 
 namespace clcxx {
@@ -93,8 +98,12 @@ void remove_c_strings(ConstantInfo obj) {
 }  // namespace detail
 
 void PackageRegistry::remove_package(std::string lpack) {
+#ifdef _MSC_VER
+  auto &pack = get_package(lpack);
+#else
   const auto iter = get_package_iter(lpack);
   auto &pack = *iter->second;
+#endif
   for (const auto &Class : pack.classes_meta_data()) {
     detail::remove_c_strings(Class);
   }
@@ -104,9 +113,13 @@ void PackageRegistry::remove_package(std::string lpack) {
   for (const auto &Func : pack.functions_meta_data()) {
     detail::remove_c_strings(Func);
   }
+#ifdef _MSC_VER
+  const auto iter = p_packages.find(lpack);
+#endif
   p_packages.erase(iter);
 }
 
+#ifndef _MSC_VER
 PackageRegistry::Iter PackageRegistry::remove_package(
     PackageRegistry::Iter iter) {
   auto &pack = *iter->second;
@@ -121,6 +134,7 @@ PackageRegistry::Iter PackageRegistry::remove_package(
   }
   return p_packages.erase(iter);
 }
+#endif
 
 Package &PackageRegistry::create_package(std::string pack_name) {
   if (has_package(pack_name)) {
