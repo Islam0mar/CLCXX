@@ -99,6 +99,7 @@ void remove_c_strings(ConstantInfo obj) {
 
 void PackageRegistry::remove_package(std::string lpack) {
 #ifdef _MSC_VER
+  const auto iter = p_packages.find(lpack);
   auto &pack = get_package(lpack);
 #else
   const auto iter = get_package_iter(lpack);
@@ -113,9 +114,6 @@ void PackageRegistry::remove_package(std::string lpack) {
   for (const auto &Func : pack.functions_meta_data()) {
     detail::remove_c_strings(Func);
   }
-#ifdef _MSC_VER
-  const auto iter = p_packages.find(lpack);
-#endif
   p_packages.erase(iter);
 }
 
