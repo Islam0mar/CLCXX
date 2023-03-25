@@ -182,7 +182,7 @@ inline auto Import(T lambda) {
 
 namespace detail {
 
-#ifdef _WIN64
+#ifdef _WIN32
    CLCXX_API char *str_dup(const char *src);
    CLCXX_API char *str_append(char *old_str, const char *src);
 #else
