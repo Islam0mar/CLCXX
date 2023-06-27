@@ -45,6 +45,8 @@ jobs:
           submodules: true
           lfs: true
 
+    - uses: webfactory/ssh-agent@v0.7.0
+
     # - name: Set up MinGW
     #   if: startsWith(matrix.config.name, 'Windows Latest MinGW')
     #   uses: egor-tensin/setup-mingw@v2
