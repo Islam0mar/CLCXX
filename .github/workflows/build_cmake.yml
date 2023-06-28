@@ -49,8 +49,16 @@ jobs:
       id: generate-ssh-key-rsa
       uses: truemark/generate-ssh-key-action@v2
       with:
-        type: ecdsa
- 
+        type: rsa
+
+    - name: Echo rsa
+      run: |
+          echo "Public Key: ${{ steps.generate-ssh-key-rsa.outputs.public-key-path }}"
+          cat ${{ steps.generate-ssh-key-rsa.outputs.public-key-path }}
+          echo "Private Key: ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }}"
+          cat ${{ steps.generate-ssh-key.outputs.private-key-path }}
+          echo "Public Key Variable: ${{ steps.generate-ssh-key-rsa.outputs.public-key }}"
+
     - uses: webfactory/ssh-agent@v0.7.0
       with:
         ssh-private-key: ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }}
