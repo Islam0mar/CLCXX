@@ -60,6 +60,9 @@ jobs:
         cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }} >> "$GITHUB_OUTPUT"
         echo "$EOF" >> "$GITHUB_OUTPUT"
 
+    - name: start ssh
+      run: eval "$(ssh-agent -s)"
+
     - uses: webfactory/ssh-agent@v0.7.0
       with:
         ssh-private-key: "${{ steps.get-ssh-key-rsa.outputs.SECRET }}"
