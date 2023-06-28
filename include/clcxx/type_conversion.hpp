@@ -3,8 +3,8 @@
 #include <complex>
 #include <cstdint>
 #include <cstring>
-#include <memory_resource>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 
 #include "clcxx_config.hpp"

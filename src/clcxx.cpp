@@ -126,7 +126,7 @@ Package &PackageRegistry::create_package(std::string pack_name) {
     throw std::runtime_error("Error registering module: " + pack_name +
                              " was already registered");
   }
-  p_packages[pack_name] = std::make_unique<Package>(pack_name);
+  p_packages[pack_name] = std::make_shared<Package>(pack_name);
   p_current_package = p_packages[pack_name].get();
   return *p_current_package;
 }
