@@ -55,10 +55,10 @@ jobs:
     - name: Get RSA SSH Key
       id: get-ssh-key-rsa
       run: |
-      EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-      echo "SECRET<<$EOF" >> "$GITHUB_OUTPUT"
-      cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }} >> "$GITHUB_OUTPUT"
-      echo "$EOF" >> "$GITHUB_OUTPUT"
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+        echo "SECRET<<$EOF" >> "$GITHUB_OUTPUT"
+        cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }} >> "$GITHUB_OUTPUT"
+        echo "$EOF" >> "$GITHUB_OUTPUT"
 
     - uses: webfactory/ssh-agent@v0.7.0
       with:
