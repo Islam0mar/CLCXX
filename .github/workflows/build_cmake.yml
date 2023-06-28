@@ -7,6 +7,7 @@ env:
   NINJA_VERSION: 1.10.2
   BUILD_TYPE: Release
   CCACHE_VERSION: 4.4
+  SEC: 0
 
 jobs:
   build:
@@ -52,12 +53,12 @@ jobs:
         type: rsa
 
     - name: Echo rsa
-      run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }}
+      run: cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }}
+          
 
     - uses: webfactory/ssh-agent@v0.7.0
       with:
-        ssh-private-key: "${{ secrets.SSH_PRIVATE_KEY }}"
+        ssh-private-key: "${{ steps.generate-ssh-key-rsa.outputs.public-key }}"
         
     # - name: Set up MinGW
     #   if: startsWith(matrix.config.name, 'Windows Latest MinGW')
