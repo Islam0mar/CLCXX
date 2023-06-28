@@ -51,8 +51,8 @@ jobs:
         type: rsa
  
     - uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ steps.generate-ssh-key-rsa.outputs.public-key-path }}
+      with:
+        ssh-private-key: ${{ steps.generate-ssh-key-rsa.outputs.public-key-path }}
         
     # - name: Set up MinGW
     #   if: startsWith(matrix.config.name, 'Windows Latest MinGW')
