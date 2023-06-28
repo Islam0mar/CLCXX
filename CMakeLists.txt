@@ -14,6 +14,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_MODULE_PATH}/lib")
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set(CMAKE_VERBOSE_MAKEFILE 1)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/bin") # .exe and .dll
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .so and .dylib
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .lib and .a
 
 # includes
 # ============
@@ -151,13 +154,14 @@ endif()
 
 if(BUILD_TESTS)
   # find_package(Eigen3 REQUIRED)
+  enable_testing()
 
   include(FetchContent)
 
-  set(CATCH_INSTALL_DOCS OFF)
+  # set(CATCH_INSTALL_DOCS OFF)
   set(CATCH_BUILD_TESTING OFF)
-  set(CATCH_INSTALL_EXTRAS OFF)
-  set(CATCH_DEVELOPMENT_BUILD OFF)
+  # set(CATCH_INSTALL_EXTRAS OFF)
+  # set(CATCH_DEVELOPMENT_BUILD OFF)
   set(BUILD_TESTING OFF)
 
   FetchContent_Declare(
@@ -181,4 +185,6 @@ if(BUILD_TESTS)
       -Wextra>
       $<$<CXX_COMPILER_ID:MSVC>:
       /W4>)
+
+  add_test(NAME TestBase COMMAND tests)
 endif(BUILD_TESTS)

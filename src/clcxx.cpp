@@ -1,16 +1,15 @@
 ﻿
 #include "clcxx/clcxx.hpp"
 
+#include <array>
 #include <cstring>
-#include <stack>
 #include <string>
 
 #include "clcxx/clcxx_config.hpp"
 
 namespace clcxx {
 
-constexpr auto pool_options = std::pmr::pool_options{
-    .max_blocks_per_chunk = 0, .largest_required_pool_block = 512};
+constexpr auto pool_options = std::pmr::pool_options{0, 512};
 
 VerboseResource &MemPool() {
   static auto buffer = std::array<std::byte, BUF_SIZE>{};
