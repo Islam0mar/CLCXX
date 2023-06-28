@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <functional>
 #include <map>
+#include <memory>
 #include <memory_resource>
 #include <string>
 #include <string_view>
@@ -182,11 +183,11 @@ inline auto Import(T lambda) {
 
 namespace detail {
 
-char *str_dup(const char *src);
-char *str_append(char *old_str, const char *src);
+CLCXX_API char *str_dup(const char *src);
+CLCXX_API char *str_append(char *old_str, const char *src);
 
 template <typename T>
-void remove_c_strings(T obj);
+CLCXX_API void remove_c_strings(T obj);
 
 // Base class to specialize for constructor
 template <typename CppT, typename... Args>
@@ -262,7 +263,7 @@ std::string super_classes_string() {
 class CLCXX_API PackageRegistry {
  public:
   /// Create a package and register it
-  Package &create_package(std::string lpack);
+  CLCXX_API Package &create_package(std::string lpack);
 
   auto get_package_iter(std::string pack) const {
     const auto iter = p_packages.find(pack);
@@ -277,13 +278,13 @@ class CLCXX_API PackageRegistry {
     return p_packages.find(lpack) != p_packages.end();
   }
 
-  void remove_package(std::string lpack);
+  CLCXX_API void remove_package(std::string lpack);
 
   using Iter = std::map<std::string, std::unique_ptr<Package>>::iterator;
-  [[nodiscard]] Iter remove_package(Iter iter);
+  [[nodiscard]] CLCXX_API Iter remove_package(Iter iter);
 
   bool has_current_package() { return p_current_package != nullptr; }
-  Package &current_package();
+  CLCXX_API Package &current_package();
   void reset_current_package() { p_current_package = nullptr; }
 
   ~PackageRegistry() {

@@ -136,7 +136,7 @@ Package &PackageRegistry::current_package() {
   return *p_current_package;
 }
 
-CLCXX_API PackageRegistry &registry() {
+PackageRegistry &registry() {
   static PackageRegistry p_registry;
   return p_registry;
 }

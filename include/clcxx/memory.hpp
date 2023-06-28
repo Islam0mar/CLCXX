@@ -2,6 +2,8 @@
 
 #include <memory_resource>
 
+#include "clcxx_config.hpp"
+
 namespace clcxx {
 
 // allocator
@@ -34,6 +36,6 @@ class VerboseResource : public std::pmr::memory_resource {
   size_t num_of_bytes_allocated;
 };
 
-[[nodiscard]] VerboseResource &MemPool();
+[[nodiscard]] CLCXX_API VerboseResource &MemPool();
 
 }  // namespace clcxx
