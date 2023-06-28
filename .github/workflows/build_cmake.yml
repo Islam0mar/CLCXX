@@ -40,14 +40,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-        with:
+      with:
         token: ${{ secrets.ACCESS_TOKEN }}
         submodules: 'true'
         lfs: 'true'
 
     - uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     # - name: Set up MinGW
     #   if: startsWith(matrix.config.name, 'Windows Latest MinGW')
