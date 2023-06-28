@@ -263,7 +263,7 @@ std::string super_classes_string() {
 class CLCXX_API PackageRegistry {
  public:
   /// Create a package and register it
-  CLCXX_API Package &create_package(std::string lpack);
+  Package &create_package(std::string lpack);
 
   auto get_package_iter(std::string pack) const {
     const auto iter = p_packages.find(pack);
@@ -278,13 +278,13 @@ class CLCXX_API PackageRegistry {
     return p_packages.find(lpack) != p_packages.end();
   }
 
-  CLCXX_API void remove_package(std::string lpack);
+  void remove_package(std::string lpack);
 
   using Iter = std::map<std::string, std::unique_ptr<Package>>::iterator;
-  [[nodiscard]] CLCXX_API Iter remove_package(Iter iter);
+  [[nodiscard]] Iter remove_package(Iter iter);
 
   bool has_current_package() { return p_current_package != nullptr; }
-  CLCXX_API Package &current_package();
+  Package &current_package();
   void reset_current_package() { p_current_package = nullptr; }
 
   ~PackageRegistry() {
