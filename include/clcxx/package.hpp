@@ -280,7 +280,7 @@ class CLCXX_API PackageRegistry {
 
   void remove_package(std::string lpack);
 
-  using Iter = std::map<std::string, std::unique_ptr<Package>>::iterator;
+  using Iter = std::map<std::string, std::shared_ptr<Package>>::iterator;
   [[nodiscard]] Iter remove_package(Iter iter);
 
   bool has_current_package() { return p_current_package != nullptr; }
@@ -310,7 +310,7 @@ class CLCXX_API PackageRegistry {
   void send_data(MetaData *M, uint8_t n) { p_meta_data_handler_callback(M, n); }
 
  private:
-  std::map<std::string, std::unique_ptr<Package>> p_packages;
+  std::map<std::string, std::shared_ptr<Package>> p_packages;
   Package *p_current_package = nullptr;
   void (*p_error_handler_callback)(char *);
   void (*p_meta_data_handler_callback)(MetaData *, uint8_t);
