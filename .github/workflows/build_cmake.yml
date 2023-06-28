@@ -54,7 +54,7 @@ jobs:
 
     - name: Get RSA SSH Key
       id: get-ssh-key-rsa
-      run: echo "SECRET='$(cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }})'" >> "$GITHUB_OUTPUT"
+      run: echo "SECRET=\"$(cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }})\"" >> "$GITHUB_OUTPUT"
 
     - uses: webfactory/ssh-agent@v0.7.0
       with:
