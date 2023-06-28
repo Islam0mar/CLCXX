@@ -53,15 +53,11 @@ jobs:
 
     - name: Echo rsa
       run: |
-          echo "Public Key: ${{ steps.generate-ssh-key-rsa.outputs.public-key-path }}"
-          cat ${{ steps.generate-ssh-key-rsa.outputs.public-key-path }}
-          echo "Private Key: ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }}"
-          cat ${{ steps.generate-ssh-key.outputs.private-key-path }}
-          echo "Public Key Variable: ${{ steps.generate-ssh-key-rsa.outputs.public-key }}"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }}
 
     - uses: webfactory/ssh-agent@v0.7.0
       with:
-        ssh-private-key: ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }}
+        ssh-private-key: "${{ secrets.SSH_PRIVATE_KEY }}"
         
     # - name: Set up MinGW
     #   if: startsWith(matrix.config.name, 'Windows Latest MinGW')
