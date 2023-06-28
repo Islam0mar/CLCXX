@@ -52,13 +52,13 @@ jobs:
       with:
         type: rsa
 
-    - name: Echo rsa
-      run: cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }}
-          
+    - name: Get RSA SSH Key
+      id: get-ssh-key-rsa
+      run: echo "SECRET=$(cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }})" >> "$GITHUB_OUTPUT"
 
     - uses: webfactory/ssh-agent@v0.7.0
       with:
-        ssh-private-key: "${{ steps.generate-ssh-key-rsa.outputs.public-key }}"
+        ssh-private-key: "${{ steps.get-ssh-key-rsa.outputs.SECRET }}"
         
     # - name: Set up MinGW
     #   if: startsWith(matrix.config.name, 'Windows Latest MinGW')
