@@ -54,11 +54,15 @@ jobs:
 
     - name: Get RSA SSH Key
       id: get-ssh-key-rsa
-      run: echo "SECRET=\"$(cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }})\"" >> $GITHUB_ENV
+      run: |
+      EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+      echo "SECRET<<$EOF" >> "$GITHUB_OUTPUT"
+      cat ${{ steps.generate-ssh-key-rsa.outputs.private-key-path }} >> "$GITHUB_OUTPUT"
+      echo "$EOF" >> "$GITHUB_OUTPUT"
 
     - uses: webfactory/ssh-agent@v0.7.0
       with:
-        ssh-private-key: "${{ env.SECRET }}"
+        ssh-private-key: "${{ steps.get-ssh-key-rsa.outputs.SECRET }}"
         
     # - name: Set up MinGW
     #   if: startsWith(matrix.config.name, 'Windows Latest MinGW')
