@@ -93,6 +93,7 @@ void remove_c_strings(ConstantInfo obj) {
 
 void PackageRegistry::remove_package(std::string lpack) {
   const auto iter = get_package_iter(lpack);
+  if (iter == p_packages.end()) return;
   auto &pack = *iter->second;
   for (const auto &Class : pack.classes_meta_data()) {
     detail::remove_c_strings(Class);
