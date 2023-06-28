@@ -47,7 +47,7 @@ jobs:
 
     - name: Generate RSA SSH Key
       id: generate-ssh-key-rsa
-      uses: ./
+      uses: truemark/generate-ssh-key-action@v2
       with:
         type: rsa
  
