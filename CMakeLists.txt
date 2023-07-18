@@ -104,7 +104,7 @@ target_compile_options(
     -O3
     -Wextra>
     $<$<CXX_COMPILER_ID:MSVC>:
-    /W4>)
+    /W4 /EHa>)
 
 target_link_libraries(${CLCXX_TARGET} ${D_LINER_FLAGS})
 set_target_properties(
@@ -184,7 +184,7 @@ if(BUILD_TESTS)
       -ggdb3
       -Wextra>
       $<$<CXX_COMPILER_ID:MSVC>:
-      /W4>)
+      /W4 /EHa>)
 
   add_test(NAME TestBase COMMAND tests)
 endif(BUILD_TESTS)

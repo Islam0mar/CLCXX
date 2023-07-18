@@ -240,7 +240,7 @@ TEST_CASE("clcxx test", "[clcxx]") {
   }
 
   REQUIRE_NOTHROW(clcxx::registry().remove_package("test"));
-  // REQUIRE_THROWS(clcxx::registry().remove_package("test"));
+  REQUIRE_THROWS(clcxx::registry().remove_package("test"));
 
-  // REQUIRE_THROWS(Test2(pack));
+  REQUIRE_THROWS(Test2(pack));
 }
